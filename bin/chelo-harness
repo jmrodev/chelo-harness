@@ -108,9 +108,19 @@ def cmd_setup():
             return
 
     print(f"{CYAN}OpenCode y Antigravity utilizan modelos como Gemini Flash (gratuito) para tareas de código.{NC}")
-    print(f"🔗 {YELLOW}Obtené tu clave gratuita acá:{NC} {BOLD}https://aistudio.google.com/app/apikey{NC}\n")
-    print(f"🔗 {YELLOW}Tokens de Slack (#practicas):{NC} {BOLD}https://api.slack.com/apps{NC}\n")
-    key = input(f"{BOLD}👉 Pegá tu Google Gemini API Key (o Enter para omitir): {NC}").strip()
+    print(f"\n{BOLD}{MAGENTA}📖 PASO A PASO PARA CONSEGUIR TU GOOGLE GEMINI API KEY GRATIS:{NC}")
+    print(f"  1. Abrí en tu navegador: {BOLD}{YELLOW}https://aistudio.google.com/app/apikey{NC}")
+    print(f"  2. Iniciá sesión con tu cuenta de Google (Gmail).")
+    print(f"  3. Hacé clic en el botón azul {BOLD}'Create API key'{NC} (o 'Crear clave de API').")
+    print(f"  4. Seleccioná cualquier proyecto existente o elegí 'Create API key in new project'.")
+    print(f"  5. Copiá el texto de la clave generada (empieza con 'AIzaSy...').")
+    print(f"  6. Pegala a continuación en esta terminal.\n")
+
+    print(f"{BOLD}{MAGENTA}📖 TOKENS DE SLACK (OPCIONAL PARA SINCRONIZAR #PRACTICAS):{NC}")
+    print(f"  • Si participás de la daily en Slack, creá un Bot en: {BOLD}{YELLOW}https://api.slack.com/apps{NC}")
+    print(f"  • Permisos recomendados: channels:history, channels:read\n")
+
+    key = input(f"{BOLD}👉 Pegá tu Google Gemini API Key acá (o Enter para omitir): {NC}").strip()
     if not key:
         print(f"{YELLOW}Omitido. Podés configurarla luego ejecutando 'chelo-harness setup'.{NC}")
         return
