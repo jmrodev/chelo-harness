@@ -36,7 +36,7 @@ install_hurl() {
   TMP_DIR="$(mktemp -d)"
   if [ "$OS" = "linux" ]; then
     curl -fsSL "https://github.com/Orange-OpenSource/hurl/releases/download/${HURL_VERSION}/hurl-${HURL_VERSION}-${ARCH}-unknown-linux-gnu.tar.gz" | tar -xz -C "$TMP_DIR"
-    cp "$TMP_DIR/hurl-${HURL_VERSION}-${ARCH}-unknown-linux-gnu/hurl" "$BIN_DIR/hurl"
+    cp "$TMP_DIR/hurl-${HURL_VERSION}-${ARCH}-unknown-linux-gnu/bin/hurl" "$BIN_DIR/hurl"
     chmod +x "$BIN_DIR/hurl"
   fi
   rm -rf "$TMP_DIR"
