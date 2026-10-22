@@ -251,17 +251,36 @@ def cmd_setup():
     current_slack = os.environ.get("SLACK_BOT_TOKEN") or os.environ.get("SLACK_USER_TOKEN")
     if current_slack == "DISABLED":
         print(f"  {YELLOW}○ Slack:{NC} Marcado como NO UTILIZADO.")
+        rec_s = input("   ¿Querés habilitar Slack y configurar un Bot Token? [s/N]: ").strip().lower()
+        if rec_s == "s":
+            current_slack = None
     elif current_slack:
         print(f"  {GREEN}✓ Slack Token detectado.{NC}")
-    else:
-        print(f"🔗 Bot Tokens en: {BOLD}{YELLOW}https://api.slack.com/apps{NC}")
-        val = input(f"👉 Pegá tu SLACK_BOT_TOKEN [o 'no' para desactivar / Enter para omitir]: ").strip()
+        reconf_s = input(f"   ¿Querés conservarlo (Enter/o), cambiarlo (c) o desactivarlo (n)? [O/c/n]: ").strip().lower()
+        if reconf_s == "n":
+            save_key_to_shells("SLACK_BOT_TOKEN", "DISABLED")
+            print(f"   {YELLOW}✓ Slack marcado como NO UTILIZADO.{NC}")
+            current_slack = "DISABLED"
+        elif reconf_s != "c":
+            print(f"   {GREEN}✓ Conservado.{NC}")
+
+    if not current_slack or current_slack not in [os.environ.get("SLACK_BOT_TOKEN"), "DISABLED"]:
+        print(f"\n{BOLD}{MAGENTA}📖 PASO A PASO PARA CONSEGUIR TU SLACK BOT TOKEN:{NC}")
+        print(f"  1. Abrí en tu navegador: {BOLD}{YELLOW}https://api.slack.com/apps{NC}")
+        print(f"  2. Hacé clic en {BOLD}'Create New App'{NC} -> 'From scratch'.")
+        print(f"  3. Nombre de la App: 'CheloHarness' y seleccioná el Workspace de tus prácticas.")
+        print(f"  4. En el menú izquierdo andá a {BOLD}'OAuth & Permissions'{NC}.")
+        print(f"  5. En 'Scopes' -> 'Bot Token Scopes' agregá: {BOLD}channels:history{NC} y {BOLD}channels:read{NC}.")
+        print(f"  6. Subí arriba y hacé clic en {BOLD}'Install to Workspace'{NC}.")
+        print(f"  7. Copiá el token que empieza con {BOLD}'xoxb-...'{NC} y pegalo acá abajo.\n")
+
+        val = input(f"👉 Pegá tu SLACK_BOT_TOKEN (xoxb-...) [o 'no' para no usar / Enter para omitir]: ").strip()
         if val.lower() in ["no", "n", "disable"]:
             save_key_to_shells("SLACK_BOT_TOKEN", "DISABLED")
             print(f"   {YELLOW}✓ Slack marcado como NO UTILIZADO.{NC}")
         elif val:
             save_key_to_shells("SLACK_BOT_TOKEN", val)
-            print(f"   {GREEN}✓ Slack configurado.{NC}")
+            print(f"   {GREEN}✓ Slack configurado exitosamente.{NC}")
 
     # Asegurar OpenCode
     home = Path.home()
