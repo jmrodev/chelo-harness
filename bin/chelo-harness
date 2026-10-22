@@ -770,8 +770,8 @@ def cmd_commit(message):
 def cmd_update():
     banner()
     print(f"{BLUE}🔄 ACTUALIZACIÓN DEL ECOSISTEMA CHELO-HARNESS{NC}\n")
-    print("Descargando la última versión de chelo-harness y sus dependencias...")
-    res = subprocess.run("curl -fsSL https://raw.githubusercontent.com/jmrodev/chelo-harness/main/install.sh | bash", shell=True)
+    print("Actualizando chelo-harness y todas sus herramientas binarias oficiales (Hurl, gh, OpenCode)...")
+    res = subprocess.run("curl -fsSL https://raw.githubusercontent.com/jmrodev/chelo-harness/main/install.sh | bash -s -- --upgrade", shell=True)
     if res.returncode == 0:
         print(f"\n{GREEN}{BOLD}✓ CHELO-HARNESS Y TODAS SUS DEPENDENCIAS ACTUALIZADAS AL DÍA.{NC}")
     else:

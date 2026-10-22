@@ -60,27 +60,33 @@ install_opencode() {
   echo "  ✓ OpenCode instalado."
 }
 
-echo "Resolviendo dependencias profesionales:"
+# Si se pasa el flag --upgrade o no existen, instala/actualiza las binarias oficiales
+UPGRADE_ALL=false
+if [ "${1:-}" = "--upgrade" ] || [ "${1:-}" = "update" ]; then
+  UPGRADE_ALL=true
+fi
+
+echo "Resolviendo y asegurando dependencias profesionales:"
 
 # 1. Hurl
-if command -v hurl >/dev/null 2>&1 || [ -x "$BIN_DIR/hurl" ]; then
-  echo "  ✓ Hurl detectado"
-else
+if [ "$UPGRADE_ALL" = true ] || (! command -v hurl >/dev/null 2>&1 && [ ! -x "$BIN_DIR/hurl" ]); then
   install_hurl
+else
+  echo "  ✓ Hurl detectado"
 fi
 
 # 2. GitHub CLI (gh)
-if command -v gh >/dev/null 2>&1 || [ -x "$BIN_DIR/gh" ]; then
-  echo "  ✓ GitHub CLI (gh) detectado"
-else
+if [ "$UPGRADE_ALL" = true ] || (! command -v gh >/dev/null 2>&1 && [ ! -x "$BIN_DIR/gh" ]); then
   install_gh
+else
+  echo "  ✓ GitHub CLI (gh) detectado"
 fi
 
 # 3. OpenCode
-if command -v opencode >/dev/null 2>&1 || [ -x "$BIN_DIR/opencode" ]; then
-  echo "  ✓ OpenCode detectado"
-else
+if [ "$UPGRADE_ALL" = true ] || (! command -v opencode >/dev/null 2>&1 && [ ! -x "$BIN_DIR/opencode" ]); then
   install_opencode
+else
+  echo "  ✓ OpenCode detectado"
 fi
 
 # 4. Prism
