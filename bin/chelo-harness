@@ -404,10 +404,10 @@ def cmd_doctor(auto_fix=False):
     else:
         print(f"  {GREEN}✓ Mock Server Nativo:{NC} Disponible en Python puro.")
 
-    if shutil.which("agy"):
+    if shutil.which("agy") or (Path.home() / ".local/bin/agy").is_file():
         print(f"  {GREEN}✓ Antigravity CLI (AGY):{NC} Instalado.")
     else:
-        print(f"  {YELLOW}⚠️  Antigravity CLI (AGY):{NC} No detectado en PATH.")
+        print(f"  {BLUE}○ Antigravity (AGY):{NC} No requerido en servidores remotos (se utiliza OpenCode CLI).")
 
     # 4. API Keys para Agentes
     keys = {
