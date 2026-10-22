@@ -31,14 +31,32 @@ case "$ARCH" in
 esac
 
 install_hurl() {
-  echo "📦 Instalando binario oficial de Hurl en $BIN_DIR..."
+  echo "📦 Instalando paquete oficial de Hurl..."
   HURL_VERSION="8.0.1"
   TMP_DIR="$(mktemp -d)"
-  if [ "$OS" = "linux" ]; then
-    curl -fsSL "https://github.com/Orange-OpenSource/hurl/releases/download/${HURL_VERSION}/hurl-${HURL_VERSION}-${ARCH}-unknown-linux-gnu.tar.gz" | tar -xz -C "$TMP_DIR"
-    cp "$TMP_DIR/hurl-${HURL_VERSION}-${ARCH}-unknown-linux-gnu/bin/hurl" "$BIN_DIR/hurl"
-    chmod +x "$BIN_DIR/hurl"
+
+  # Si estamos en Debian/Ubuntu y hay sudo/apt, usar apt con el .deb oficial
+  if [ -f /etc/debian_version ] && command -v apt >/dev/null 2>&1; then
+    DEB_URL="https://github.com/Orange-OpenSource/hurl/releases/download/${HURL_VERSION}/hurl_${HURL_VERSION}_${ARCH_ALT}.deb"
+    if curl -fsSL -o "$TMP_DIR/hurl.deb" "$DEB_URL" 2>/dev/null; then
+      if [ "$(id -u)" -eq 0 ]; then
+        apt install -y "$TMP_DIR/hurl.deb"
+      elif command -v sudo >/dev/null 2>&1; then
+        sudo apt install -y "$TMP_DIR/hurl.deb"
+      fi
+    fi
   fi
+
+  # Fallback a binario en ~/.local/bin si no se instaló a nivel sistema
+  if ! command -v hurl >/dev/null 2>&1; then
+    echo "   (Instalando binario estático en $BIN_DIR/hurl)"
+    if [ "$OS" = "linux" ]; then
+      curl -fsSL "https://github.com/Orange-OpenSource/hurl/releases/download/${HURL_VERSION}/hurl-${HURL_VERSION}-${ARCH}-unknown-linux-gnu.tar.gz" | tar -xz -C "$TMP_DIR"
+      cp "$TMP_DIR/hurl-${HURL_VERSION}-${ARCH}-unknown-linux-gnu/bin/hurl" "$BIN_DIR/hurl"
+      chmod +x "$BIN_DIR/hurl"
+    fi
+  fi
+
   rm -rf "$TMP_DIR"
   echo "  ✓ Hurl instalado correctamente."
 }
