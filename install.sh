@@ -124,5 +124,23 @@ if [ "$UPGRADE_ALL" = true ] || (! command -v prism >/dev/null 2>&1 && [ ! -x "$
 else
   echo "  ✓ Prism CLI detectado"
 fi
+
+install_agy() {
+  # Verificar si la CPU soporta la instrucción obligatoria pclmulqdq requerida por Antigravity
+  if grep -m 1 flags /proc/cpuinfo 2>/dev/null | grep -q -w "pclmulqdq"; then
+    echo "📦 Instalando Google Antigravity CLI (agy) oficial..."
+    curl -fsSL https://antigravity.google/cli/install.sh | bash
+    echo "  ✓ Antigravity CLI instalado."
+  else
+    echo "  ○ Antigravity CLI omitido (la CPU no cuenta con la instrucción de hardware pclmul requerida)."
+  fi
+}
+
+# 5. Antigravity (AGY)
+if ! command -v agy >/dev/null 2>&1 && [ ! -x "$BIN_DIR/agy" ]; then
+  install_agy
+else
+  echo "  ✓ Antigravity CLI detectado"
+fi
 echo ""
 echo "🚀 ¡Listo! Ejecutá 'chelo-harness' en cualquier repositorio Git para arrancar."

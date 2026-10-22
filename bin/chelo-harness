@@ -452,10 +452,22 @@ def cmd_doctor(auto_fix=False):
     else:
         print(f"  {GREEN}✓ Mock Server Nativo:{NC} Disponible en Python puro.")
 
+    # 5. Antigravity (AGY)
     if shutil.which("agy") or (Path.home() / ".local/bin/agy").is_file():
-        print(f"  {GREEN}✓ Antigravity CLI (AGY):{NC} Instalado.")
+        print(f"  {GREEN}✓ Antigravity CLI (AGY):{NC} Instalado y listo.")
     else:
-        print(f"  {BLUE}○ Antigravity (AGY):{NC} No requerido en servidores remotos (se utiliza OpenCode CLI).")
+        # Chequear si la CPU tiene soporte para la instrucción pclmul
+        has_pclmul = False
+        try:
+            with open("/proc/cpuinfo", encoding="utf-8") as f:
+                has_pclmul = "pclmulqdq" in f.read()
+        except Exception:
+            pass
+
+        if not has_pclmul:
+            print(f"  {BLUE}○ Antigravity (AGY):{NC} Omitido (esta CPU no posee la instrucción de hardware pclmul; se utiliza OpenCode CLI).")
+        else:
+            print(f"  {YELLOW}○ Antigravity (AGY):{NC} No instalado (ejecutá 'chelo-harness setup' para instalarlo).")
 
     # 4. API Keys para Agentes
     keys = {
