@@ -43,6 +43,7 @@ def check_git_repo():
     res = subprocess.run(["git", "rev-parse", "--is-inside-work-tree"], capture_output=True)
     if res.returncode != 0:
         print(f"{RED}❌ Error: chelo-harness debe ejecutarse dentro de un repositorio Git.{NC}")
+        print(f"{YELLOW}Tip: Ejecutá 'chelo-harness init' para inicializar este proyecto de cero.{NC}")
         sys.exit(1)
 
 def get_project_name():
@@ -94,6 +95,145 @@ def audit_changes_rule():
         return False
     return True
 
+def cmd_setup():
+    banner()
+    print(f"{BLUE}🔑 ASISTENTE UNIVERSAL DE CONFIGURACIÓN DE CLAVES (SETUP){NC}\n")
+
+    current_gemini = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY") or os.environ.get("GOOGLE_GENERATIVE_AI_API_KEY")
+    if current_gemini:
+        print(f"  {GREEN}✓ Google Gemini API Key ya detectada:{NC} {current_gemini[:4]}...{current_gemini[-4:]}")
+        reconf = input(f"   ¿Querés reconfigurarla? [s/N]: ").strip().lower()
+        if reconf != "s":
+            print(f"\n{GREEN}✓ Configuración conservada.{NC}")
+            return
+
+    print(f"{CYAN}OpenCode y Antigravity utilizan modelos como Gemini Flash (gratuito) para tareas de código.{NC}")
+    key = input(f"{BOLD}👉 Pegá tu Google Gemini API Key (o Enter para omitir): {NC}").strip()
+    if not key:
+        print(f"{YELLOW}Omitido. Podés configurarla luego ejecutando 'chelo-harness setup'.{NC}")
+        return
+
+    # Detectar shell y guardar persistentemente de forma universal
+    home = Path.home()
+    user_shell = os.environ.get("SHELL", "")
+
+    # 1. Si usa Fish
+    if "fish" in user_shell or (home / ".config/fish").exists():
+        fish_secrets = home / ".config/fish/conf.d/secrets.fish"
+        fish_secrets.parent.mkdir(parents=True, exist_ok=True)
+        with open(fish_secrets, "a", encoding="utf-8") as f:
+            f.write(f"\nset -gx GEMINI_API_KEY '{key}'\nset -gx GOOGLE_GENERATIVE_AI_API_KEY '{key}'\n")
+        print(f"  {GREEN}✓ Guardada en Fish:{NC} {fish_secrets}")
+
+    # 2. Universal Linux / Mac (~/.profile y ~/.bashrc)
+    bashrc = home / ".bashrc"
+    if bashrc.exists():
+        with open(bashrc, "a", encoding="utf-8") as f:
+            f.write(f"\nexport GEMINI_API_KEY=\"{key}\"\nexport GOOGLE_GENERATIVE_AI_API_KEY=\"{key}\"\n")
+        print(f"  {GREEN}✓ Guardada en Bash:{NC} {bashrc}")
+
+    profile = home / ".profile"
+    with open(profile, "a", encoding="utf-8") as f:
+        f.write(f"\nexport GEMINI_API_KEY=\"{key}\"\nexport GOOGLE_GENERATIVE_AI_API_KEY=\"{key}\"\n")
+    print(f"  {GREEN}✓ Guardada en perfil universal:{NC} {profile}")
+
+    # 3. Fallback local en .env si estamos en un repo
+    local_env = Path.cwd() / ".env"
+    with open(local_env, "a", encoding="utf-8") as f:
+        f.write(f"\nGEMINI_API_KEY=\"{key}\"\nGOOGLE_GENERATIVE_AI_API_KEY=\"{key}\"\n")
+    print(f"  {GREEN}✓ Guardada en .env local:{NC} {local_env}")
+
+    os.environ["GEMINI_API_KEY"] = key
+    os.environ["GOOGLE_GENERATIVE_AI_API_KEY"] = key
+    print(f"\n{GREEN}{BOLD}✓ Clave configurada y activa para esta sesión.{NC}\n")
+
+def cmd_init():
+    banner()
+    print(f"{BLUE}🚀 INICIALIZANDO PROYECTO BAJO METODOLOGÍA SPEC-FIRST{NC}\n")
+
+    cwd = Path.cwd()
+
+    # 1. Git init si no existe
+    if not (cwd / ".git").exists():
+        subprocess.run(["git", "init"], check=True)
+        print(f"  {GREEN}✓ Repositorio Git inicializado.{NC}")
+
+    # 2. Estructura de carpetas
+    docs_dir = cwd / "docs"
+    tests_dir = cwd / "tests"
+    docs_dir.mkdir(exist_ok=True)
+    tests_dir.mkdir(exist_ok=True)
+    print(f"  {GREEN}✓ Carpetas creadas:{NC} docs/ (Docs-as-Code) y tests/ (Pruebas Hurl)")
+
+    # 3. .gitignore
+    gitignore = cwd / ".gitignore"
+    if not gitignore.exists():
+        with open(gitignore, "w", encoding="utf-8") as f:
+            f.write("# Secrets & Envs\n.env\n.env.*\n!.env.example\n\n# Dependencies\nnode_modules/\nvendor/\n.venv/\n__pycache__/\n\n# Media\n*.mp4\n*.m4a\n*.mp3\n")
+        print(f"  {GREEN}✓ Archivo .gitignore creado con reglas de seguridad.{NC}")
+
+    # 4. openapi.yaml inicial
+    openapi_file = cwd / "openapi.yaml"
+    if not openapi_file.exists():
+        project = cwd.name
+        content = f"""openapi: 3.0.3
+info:
+  title: API {project}
+  version: 1.0.0
+  description: Contrato generado por chelo-harness bajo metodología Spec-First.
+paths:
+  /health:
+    get:
+      summary: Healthcheck del sistema
+      responses:
+        '200':
+          description: Servicio saludable y operativo
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - status
+                  - timestamp
+                properties:
+                  status:
+                    type: string
+                    example: "ok"
+                  timestamp:
+                    type: string
+                    example: "2026-10-22T19:00:00Z"
+"""
+        with open(openapi_file, "w", encoding="utf-8") as f:
+            f.write(content)
+        print(f"  {GREEN}✓ Contrato base openapi.yaml creado con endpoint /health.{NC}")
+
+    # 5. Primer test Hurl
+    hurl_file = tests_dir / "000_health.hurl"
+    if not hurl_file.exists():
+        hurl_content = """# Test inicial de contrato con Prism Mock
+GET http://localhost:4010/health
+
+HTTP 200
+[Asserts]
+header "sl-violations" not exists
+jsonpath "$.status" == "ok"
+"""
+        with open(hurl_file, "w", encoding="utf-8") as f:
+            f.write(hurl_content)
+        print(f"  {GREEN}✓ Primer test de contrato creado:{NC} tests/000_health.hurl")
+
+    # 6. Docs inicial
+    readme_docs = docs_dir / "00-arquitectura.md"
+    if not readme_docs.exists():
+        with open(readme_docs, "w", encoding="utf-8") as f:
+            f.write(f"# Arquitectura del Proyecto {cwd.name}\n\nDocumentación viva de contratos y diagramas Mermaid.\n")
+
+    print(f"\n{GREEN}{BOLD}🎉 ¡Proyecto inicializado con éxito!{NC}")
+    print(f"{CYAN}Para probar el ciclo en 10 segundos:{NC}")
+    print(f"  1. {YELLOW}chelo-harness mock &{NC}  (Levanta el servidor simulado en :4010)")
+    print(f"  2. {YELLOW}chelo-harness test{NC}    (Ejecuta tests/000_health.hurl)")
+    print("")
+
 def cmd_doctor():
     banner()
     print(f"{BLUE}🔍 CHEQUEO DE ENTORNO, HERRAMIENTAS Y CLAVES (DOCTOR){NC}\n")
@@ -142,7 +282,7 @@ def cmd_doctor():
         if val:
             print(f"  {GREEN}✓ {k}:{NC} Configurada ({val[:4]}...{val[-4:] if len(val)>8 else ''})")
         else:
-            print(f"  {YELLOW}○ {k}:{NC} No configurada (opcional según el modelo/agente)")
+            print(f"  {YELLOW}○ {k}:{NC} No configurada (ejecutá 'chelo-harness setup' para configurarla)")
     print("")
 
 def cmd_daily_sync():
@@ -199,6 +339,7 @@ def cmd_mock():
     spec = find_openapi_spec()
     if not spec:
         print(f"{RED}❌ No se encontró archivo de especificación OpenAPI (*.yaml) en el repositorio.{NC}")
+        print(f"{YELLOW}Tip: Ejecutá 'chelo-harness init' para crear tu openapi.yaml base.{NC}")
         sys.exit(1)
     print(f"{BLUE}🚀 Levantando Prism Mock Server desde:{NC} {spec}")
     print(f"{GREEN}✓ Servidor simulado activo en:{NC} {BOLD}http://localhost:{PRISM_PORT}{NC}")
@@ -335,10 +476,9 @@ def cmd_interactive_session():
     p_restriccion = select_option("¿Cuál es la restricción crítica que el agente NO puede violar?", restricciones)
     print(f"   {GREEN}✓ Seleccionado:{NC} {p_restriccion}\n")
 
-    # SELECCIÓN INTELIGENTE DE AGENTE (CON DETECCIÓN DE DISPONIBILIDAD)
+    # SELECCIÓN INTELIGENTE DE AGENTE
     has_opencode = bool(shutil.which("opencode"))
     has_agy = bool(shutil.which("agy"))
-    has_clipboard = bool(shutil.which("wl-copy") or shutil.which("xclip") or shutil.which("pbcopy"))
 
     agentes = []
     if has_opencode:
@@ -474,6 +614,8 @@ def print_help():
     banner()
     print("COMANDOS DISPONIBLES:")
     print("  chelo-harness                   Inicia sesión ágil guiada (Requerimientos -> Contrato -> Agente)")
+    print("  chelo-harness init              Inicializa un proyecto nuevo (git, docs/, tests/, openapi.yaml)")
+    print("  chelo-harness setup             Asistente universal de claves (Gemini API Key para OpenCode)")
     print("  chelo-harness doctor            Diagnóstico de herramientas (gh, prism, hurl, opencode, keys)")
     print("  chelo-harness sync              Sincronización Daily Scrum (Slack #practicas + Milestones GitHub)")
     print("  chelo-harness board [open|init] Abre el Daily Board o inyecta su GitHub Pages con one-liner")
@@ -492,6 +634,10 @@ def main():
     cmd = sys.argv[1]
     if cmd in ["ask", "learn", "start", "run", "menu"]:
         cmd_interactive_session()
+    elif cmd == "init":
+        cmd_init()
+    elif cmd in ["setup", "config", "keys"]:
+        cmd_setup()
     elif cmd in ["doctor", "check"]:
         cmd_doctor()
     elif cmd in ["sync", "daily", "novedades"]:
