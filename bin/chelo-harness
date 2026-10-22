@@ -108,6 +108,8 @@ def cmd_setup():
             return
 
     print(f"{CYAN}OpenCode y Antigravity utilizan modelos como Gemini Flash (gratuito) para tareas de código.{NC}")
+    print(f"🔗 {YELLOW}Obtené tu clave gratuita acá:{NC} {BOLD}https://aistudio.google.com/app/apikey{NC}\n")
+    print(f"🔗 {YELLOW}Tokens de Slack (#practicas):{NC} {BOLD}https://api.slack.com/apps{NC}\n")
     key = input(f"{BOLD}👉 Pegá tu Google Gemini API Key (o Enter para omitir): {NC}").strip()
     if not key:
         print(f"{YELLOW}Omitido. Podés configurarla luego ejecutando 'chelo-harness setup'.{NC}")
