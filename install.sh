@@ -112,7 +112,7 @@ else
 fi
 
 # 3. OpenCode
-if [ "$UPGRADE_ALL" = true ] || (! command -v opencode >/dev/null 2>&1 && [ ! -x "$BIN_DIR/opencode" ]); then
+if [ "$UPGRADE_ALL" = true ] || (! command -v opencode >/dev/null 2>&1 && [ ! -x "$BIN_DIR/opencode" ] && [ ! -x "$HOME/.opencode/bin/opencode" ]); then
   install_opencode
 else
   echo "  ✓ OpenCode detectado"
