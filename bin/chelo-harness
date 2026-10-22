@@ -63,6 +63,11 @@ def load_persisted_env():
 # Auto-cargar variables guardadas al inicio de la ejecución
 load_persisted_env()
 
+# Asegurar que ~/.local/bin y ~/.opencode/bin estén en PATH del proceso
+for extra_bin in [Path.home() / ".local/bin", Path.home() / ".opencode/bin"]:
+    if extra_bin.is_dir() and str(extra_bin) not in os.environ.get("PATH", ""):
+        os.environ["PATH"] = f"{extra_bin}:{os.environ.get('PATH', '')}"
+
 CYAN = "\033[0;36m"
 GREEN = "\033[0;32m"
 YELLOW = "\033[1;33m"
@@ -301,40 +306,42 @@ jsonpath "$.status" == "ok"
     print(f"  2. {YELLOW}chelo-harness test{NC}    (Ejecuta tests/000_health.hurl)")
     print("")
 
-def ensure_tool_installed(tool_name):
-    """Instala o repara automáticamente una herramienta si falta en el sistema."""
-    print(f"📦 {YELLOW}Instalando automáticamente {tool_name} para el sistema...{NC}")
-    cmd = f"curl -fsSL https://raw.githubusercontent.com/jmrodev/chelo-harness/main/install.sh?v=$(date +%s) | bash"
-    subprocess.run(cmd, shell=True)
+def find_opencode_runner():
+    """Detecta opencode en PATH, ~/.opencode/bin o ~/.local/bin."""
+    if shutil.which("opencode"):
+        return "opencode"
+    candidates = [
+        Path.home() / ".opencode/bin/opencode",
+        Path.home() / ".local/bin/opencode"
+    ]
+    for c in candidates:
+        if c.is_file() and os.access(c, os.X_OK):
+            return str(c)
+    return None
 
 def cmd_doctor(auto_fix=False):
     banner()
     print(f"{BLUE}🔍 CHEQUEO DE ENTORNO, HERRAMIENTAS Y CLAVES (DOCTOR){NC}\n")
-
-    # Si se pide auto_fix o faltan herramientas críticas, chelo-harness las instala solo
-    needs_fix = False
 
     # 1. Hurl
     hurl_runner = find_hurl_runner()
     if hurl_runner:
         print(f"  {GREEN}✓ Hurl:{NC} Instalado y listo ({hurl_runner}).")
     else:
-        print(f"  {YELLOW}○ Hurl no detectado.{NC}")
-        ensure_tool_installed("Hurl")
+        print(f"  {YELLOW}○ Hurl no detectado (ejecutá 'chelo-harness setup').{NC}")
 
     # 2. GitHub CLI
     if shutil.which("gh") or (Path.home() / ".local/bin/gh").is_file():
         print(f"  {GREEN}✓ GitHub CLI (gh):{NC} Instalado.")
     else:
-        print(f"  {YELLOW}○ GitHub CLI (gh) no detectado.{NC}")
-        ensure_tool_installed("GitHub CLI")
+        print(f"  {YELLOW}○ GitHub CLI (gh) no detectado (ejecutá 'chelo-harness setup').{NC}")
 
     # 3. OpenCode
-    if shutil.which("opencode") or (Path.home() / ".local/bin/opencode").is_file():
-        print(f"  {GREEN}✓ OpenCode CLI:{NC} Instalado y listo para ejecución TDD.")
+    opencode_bin = find_opencode_runner()
+    if opencode_bin:
+        print(f"  {GREEN}✓ OpenCode CLI:{NC} Instalado y listo ({opencode_bin}).")
     else:
-        print(f"  {YELLOW}○ OpenCode no detectado.{NC}")
-        ensure_tool_installed("OpenCode")
+        print(f"  {YELLOW}○ OpenCode no detectado (ejecutá 'chelo-harness setup').{NC}")
 
     # 4. Prism
     prism_runner = find_prism_runner()
