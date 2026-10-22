@@ -112,23 +112,10 @@ else
 fi
 
 # 3. OpenCode
-if [ "$UPGRADE_ALL" = true ]; then
-  # Solo actualizar si el usuario corrió explícitamente upgrade y hay versión nueva
-  CURRENT_OC=""
-  if command -v opencode >/dev/null 2>&1; then
-    CURRENT_OC="$(opencode --version 2>/dev/null || echo '')"
-  elif [ -x "$HOME/.opencode/bin/opencode" ]; then
-    CURRENT_OC="$("$HOME/.opencode/bin/opencode" --version 2>/dev/null || echo '')"
-  fi
-  if [ -z "$CURRENT_OC" ]; then
-    install_opencode
-  else
-    echo "  ✓ OpenCode detectado ($CURRENT_OC) — omitiendo descarga redundante"
-  fi
-elif (! command -v opencode >/dev/null 2>&1 && [ ! -x "$BIN_DIR/opencode" ] && [ ! -x "$HOME/.opencode/bin/opencode" ]); then
+if [ -x "$HOME/.opencode/bin/opencode" ] || [ -x "$BIN_DIR/opencode" ] || command -v opencode >/dev/null 2>&1; then
+  echo "  ✓ OpenCode detectado en disco (omitiendo descarga)"
+elif [ "$UPGRADE_ALL" = true ] || ! command -v opencode >/dev/null 2>&1; then
   install_opencode
-else
-  echo "  ✓ OpenCode detectado"
 fi
 
 # 4. Prism (Offline Standalone)
