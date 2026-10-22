@@ -50,10 +50,10 @@ def get_secret(key, default=None):
 def get_slack_messages(channel_id=None, limit=5):
     """Retorna lista de mensajes recientes de Slack en formato dict estructurado."""
     token = get_secret("SLACK_USER_TOKEN") or get_secret("SLACK_BOT_TOKEN")
-    if not token:
+    if not token or token == "DISABLED":
         return {"ok": False, "error": "No token configurado (SLACK_BOT_TOKEN / SLACK_USER_TOKEN)"}
 
-    ch = channel_id or get_secret("SLACK_CHANNEL_PRACTICAS", "C0APHGKPTHA")
+    ch = channel_id or get_secret("SLACK_CHANNEL_ID") or get_secret("SLACK_CHANNEL_PRACTICAS", "C0APHGKPTHA")
     url = f"https://slack.com/api/conversations.history?channel={ch}&limit={limit}"
     req = urllib.request.Request(url, headers={
         "Authorization": f"Bearer {token}",

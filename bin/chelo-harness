@@ -271,7 +271,7 @@ def cmd_setup():
             print(f"   {GREEN}✓ OpenAI configurado.{NC}")
 
     # 4. SLACK
-    print(f"\n{CYAN}--- SLACK #PRACTICAS (Opcional para Daily Scrum) ---{NC}")
+    print(f"\n{CYAN}--- SLACK (Opcional para sincronización de equipo) ---{NC}")
     current_slack = os.environ.get("SLACK_BOT_TOKEN") or os.environ.get("SLACK_USER_TOKEN")
     if current_slack == "DISABLED":
         print(f"  {YELLOW}○ Slack:{NC} Marcado como NO UTILIZADO.")
@@ -292,7 +292,7 @@ def cmd_setup():
         print(f"\n{BOLD}{MAGENTA}📖 PASO A PASO PARA CONSEGUIR TU SLACK BOT TOKEN:{NC}")
         print(f"  1. Abrí en tu navegador: {BOLD}{YELLOW}https://api.slack.com/apps{NC}")
         print(f"  2. Hacé clic en {BOLD}'Create New App'{NC} -> 'From scratch'.")
-        print(f"  3. Nombre de la App: 'CheloHarness' y seleccioná el Workspace de tus prácticas.")
+        print(f"  3. Nombre de la App: 'CheloHarness' y seleccioná el Workspace de tu equipo.")
         print(f"  4. En el menú izquierdo andá a {BOLD}'OAuth & Permissions'{NC}.")
         print(f"  5. En 'Scopes' -> 'Bot Token Scopes' agregá: {BOLD}channels:history{NC} y {BOLD}channels:read{NC}.")
         print(f"  6. Subí arriba y hacé clic en {BOLD}'Install to Workspace'{NC}.")
@@ -305,6 +305,11 @@ def cmd_setup():
         elif val:
             save_key_to_shells("SLACK_BOT_TOKEN", val)
             print(f"   {GREEN}✓ Slack configurado exitosamente.{NC}")
+
+        ch_val = input(f"👉 ID del canal de Slack a monitorear (Enter para omitir o canal por defecto): ").strip()
+        if ch_val:
+            save_key_to_shells("SLACK_CHANNEL_ID", ch_val)
+            print(f"   {GREEN}✓ Canal de Slack configurado: {ch_val}{NC}")
 
     # Asegurar OpenCode
     home = Path.home()
@@ -473,13 +478,17 @@ def cmd_daily_sync():
     banner()
     print(f"{BLUE}☕ SINCRONIZACIÓN DAILY SCRUM & CANALES DEL EQUIPO{NC}\n")
 
-    print(f"{CYAN}📡 Consultando canal #practicas de Slack...{NC}")
-    res = chelo_channels.get_slack_messages(limit=3)
-    if res.get("ok"):
-        for m in res.get("messages", []):
-            print(f"   💬 {YELLOW}{m.get('user')}{NC}: {m.get('text')[:120]}...")
+    slack_status = os.environ.get("SLACK_BOT_TOKEN")
+    if slack_status == "DISABLED":
+        print(f"  {YELLOW}○ Slack marcado como no utilizado.{NC}")
     else:
-        print(f"   {YELLOW}⚠️  Slack no disponible o sin token: {res.get('error')}{NC}")
+        print(f"{CYAN}📡 Consultando canal de equipo de Slack...{NC}")
+        res = chelo_channels.get_slack_messages(limit=3)
+        if res.get("ok"):
+            for m in res.get("messages", []):
+                print(f"   💬 {YELLOW}{m.get('user')}{NC}: {m.get('text')[:120]}...")
+        else:
+            print(f"   {YELLOW}⚠️  Slack no disponible o sin token: {res.get('error')}{NC}")
 
     print(f"\n{CYAN}📌 Consultando Sprint y Milestones de GitHub...{NC}")
     if shutil.which("gh"):
