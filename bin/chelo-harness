@@ -767,6 +767,16 @@ def cmd_commit(message):
     if res.returncode == 0:
         print(f"{GREEN}✓ Commit exitoso.{NC}")
 
+def cmd_update():
+    banner()
+    print(f"{BLUE}🔄 ACTUALIZACIÓN DEL ECOSISTEMA CHELO-HARNESS{NC}\n")
+    print("Descargando la última versión de chelo-harness y sus dependencias...")
+    res = subprocess.run("curl -fsSL https://raw.githubusercontent.com/jmrodev/chelo-harness/main/install.sh | bash", shell=True)
+    if res.returncode == 0:
+        print(f"\n{GREEN}{BOLD}✓ CHELO-HARNESS Y TODAS SUS DEPENDENCIAS ACTUALIZADAS AL DÍA.{NC}")
+    else:
+        print(f"\n{RED}❌ Error durante la actualización.{NC}")
+
 def print_help():
     banner()
     print("COMANDOS DISPONIBLES:")
@@ -774,6 +784,7 @@ def print_help():
     print("  chelo-harness init              Inicializa un proyecto nuevo (git, docs/, tests/, openapi.yaml)")
     print("  chelo-harness setup             Asistente universal de claves (Gemini API Key para OpenCode)")
     print("  chelo-harness doctor            Diagnóstico de herramientas (gh, prism, hurl, opencode, keys)")
+    print("  chelo-harness update            Actualiza chelo-harness y todas sus herramientas al día")
     print("  chelo-harness sync              Sincronización Daily Scrum (Slack #practicas + Milestones GitHub)")
     print("  chelo-harness board [open|init] Abre el Daily Board o inyecta su GitHub Pages con one-liner")
     print("  chelo-harness mock              Levanta Prism Mock Server (:4010) leyendo el openapi.yaml")
@@ -797,6 +808,8 @@ def main():
         cmd_setup()
     elif cmd in ["doctor", "check"]:
         cmd_doctor()
+    elif cmd in ["update", "upgrade"]:
+        cmd_update()
     elif cmd in ["sync", "daily", "novedades"]:
         cmd_daily_sync()
     elif cmd == "board":
