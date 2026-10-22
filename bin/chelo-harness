@@ -159,6 +159,12 @@ def cmd_setup():
     os.environ["GOOGLE_GENERATIVE_AI_API_KEY"] = key
     print(f"\n{GREEN}{BOLD}✓ Clave configurada y activa para esta sesión.{NC}\n")
 
+    # Asegurar que OpenCode esté instalado durante el setup
+    if not shutil.which("opencode") and not (home / ".local/bin/opencode").is_file():
+        print(f"{CYAN}Instalando OpenCode CLI para que quede listo con tu nueva clave...{NC}")
+        subprocess.run("curl -fsSL https://opencode.ai/install | bash", shell=True)
+        print(f"  {GREEN}✓ OpenCode instalado exitosamente.{NC}\n")
+
 def cmd_init():
     banner()
     print(f"{BLUE}🚀 INICIALIZANDO PROYECTO BAJO METODOLOGÍA SPEC-FIRST{NC}\n")
