@@ -137,7 +137,14 @@ def cmd_setup():
             f.write(f"\nset -gx GEMINI_API_KEY '{key}'\nset -gx GOOGLE_GENERATIVE_AI_API_KEY '{key}'\n")
         print(f"  {GREEN}✓ Guardada en Fish:{NC} {fish_secrets}")
 
-    # 2. Universal Linux / Mac (~/.profile y ~/.bashrc)
+    # 2. Si usa Zsh
+    zshrc = home / ".zshrc"
+    if "zsh" in user_shell or zshrc.exists():
+        with open(zshrc, "a", encoding="utf-8") as f:
+            f.write(f"\nexport GEMINI_API_KEY=\"{key}\"\nexport GOOGLE_GENERATIVE_AI_API_KEY=\"{key}\"\n")
+        print(f"  {GREEN}✓ Guardada en Zsh:{NC} {zshrc}")
+
+    # 3. Universal Linux / Mac (~/.profile y ~/.bashrc)
     bashrc = home / ".bashrc"
     if bashrc.exists():
         with open(bashrc, "a", encoding="utf-8") as f:
