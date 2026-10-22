@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 chelo-harness — Coding-Agent Harness con Gobernanza, Sincronización Daily/Canales (Slack/GitHub),
-                Levantamiento de Requerimientos (Juan López), Spec-First / Docs-as-Code (Mermaid/OpenAPI/Hurl),
+                Levantamiento de Requerimientos (Spec-First), Spec-First / Docs-as-Code (Mermaid/OpenAPI/Hurl),
                 Prism Mock/Proxy Engine, Memoria en Engram y Orquestación.
 Autor: Juan Marcelo Rodríguez (jmrodev)
 """
@@ -207,7 +207,7 @@ def cmd_interactive_session():
     cmd_daily_sync()
 
     # =========================================================================
-    # FASE 0: INVESTIGACIÓN Y LEVANTAMIENTO DE REQUERIMIENTOS (JUAN LÓPEZ)
+    # FASE 0: INVESTIGACIÓN Y LEVANTAMIENTO DE REQUERIMIENTOS (Spec-First)
     # =========================================================================
     print(f"{MAGENTA}{BOLD}📋 FASE 0: INVESTIGACIÓN & LEVANTAMIENTO DE REQUERIMIENTOS{NC}")
     print(f"{YELLOW}Antes del código y la arquitectura técnica, definimos el problema de negocio.{NC}\n")
@@ -267,7 +267,7 @@ def cmd_interactive_session():
     print(f"   {GREEN}✓ Seleccionado:{NC} {p_arquitectura}\n")
 
     disciplinas_spec = [
-        "Ciclo Completo Juan López: Documentación (Actores/Alcance/Gherkin) + OpenAPI + Prism Mock (:4010) + Hurl Tests",
+        "Ciclo Completo Spec-First: Documentación (Actores/Alcance/Gherkin) + OpenAPI + Prism Mock (:4010) + Hurl Tests",
         "API-First Estricto: Contrato OpenAPI (.yaml) + Prism Mock + Tests Hurl sin violaciones ('sl-violations')",
         "TDD Backend: Endpoint en PHP/Node validado vía Prism Proxy antes de persistir",
         "Docs-as-Code: Diagramas Mermaid (.mmd) integrados en Markdown"
@@ -285,7 +285,7 @@ def cmd_interactive_session():
     print(f"   {GREEN}✓ Seleccionado:{NC} {p_lenguaje}\n")
 
     restricciones = [
-        "REGLA DE CONTRATO (JUAN LÓPEZ): El test Hurl debe validar que no exista el header 'sl-violations'",
+        "REGLA DE CONTRATO (Spec-First): El test Hurl debe validar que no exista el header 'sl-violations'",
         "REGLA DE TDD: Ningún endpoint en backend sin su test .hurl correspondiente",
         "REGLA DE SIMPLICIDAD: Cero bases de datos pesadas en fase de diseño; resolver primero con mock/sqlite",
         "REGLA DE CONTENEDOR: El proyecto debe levantarse de forma reproducible sin paquetes globales",
@@ -338,7 +338,7 @@ def cmd_interactive_session():
         f"{f'  • TICKET GITHUB: Closes #{selected_issue_number}' if selected_issue_number else ''}\n\n"
         f"ARQUITECTURA: {p_arquitectura}\n"
         f"STACK: {p_lenguaje}\n\n"
-        f"PROTOCOLO STRICT SPEC-FIRST (JUAN LÓPEZ):\n"
+        f"PROTOCOLO STRICT SPEC-FIRST (Spec-First):\n"
         f"  1. DOCUMENTACIÓN & MODELADO: Definir casos de negocio en markdown y diagramas Mermaid (.mmd).\n"
         f"  2. CONTRATO SAGRADO: Escribir/actualizar openapi.yaml con schemas, rutas y examples.\n"
         f"  3. PRISM MOCK: El endpoint debe responder en http://localhost:4010 simulado por Prism sin BBDD.\n"

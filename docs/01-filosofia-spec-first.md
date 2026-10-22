@@ -1,6 +1,6 @@
 # 01. Filosofía Spec-First y Contract-Driven
 
-> *"El Backend y la Base de Datos son un detalle tardío de implementación."* — Cátedra Juan López / Gentle-AI
+> *"El Backend y la Base de Datos son un detalle tardío de implementación."* — Cátedra Spec-First / Harness
 
 ## El Problema del Código sin Contrato
 La mayoría de los agentes de IA generan código acoplado de inmediato a bases de datos, librerías de moda y estructuras desorganizadas. 

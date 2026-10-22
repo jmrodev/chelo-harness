@@ -1,7 +1,7 @@
 # 02. Arquitectura, Gobernanza y Frenos de Seguridad
 
 ## La Regla de los 10 Cambios (Disyuntor de Seguridad)
-Inspirada en las mejores prácticas de **Gentleman Programming (Alan Buscaglia)**:
+Inspirada en las mejores prácticas de **Harness (Harness)**:
 - Un agente autónomo que modifica más de 10 archivos en una sola iteración ha perdido el foco o está intentando resolver un Epic completo en un solo paso.
 - Chelo-Harness audita `git status --porcelain`. Si detecta más de 10 archivos modificados, **interrumpe la ejecución de inmediato**.
 

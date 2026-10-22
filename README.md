@@ -1,7 +1,7 @@
 # 🛡️ Chelo-Harness
 
 > **Coding-Agent Runtime con Gobernanza, Metodología Spec-First (OpenAPI + Prism + Hurl), Sincronización Daily Scrum y Gestión Ágil con Daily Board.**  
-> *Inspirado en la ingeniería de software de la cátedra de Juan López (ISFDyT 166) y la filosofía de arneses de Alan Buscaglia (Gentleman Programming).*
+> *Inspirado en la ingeniería de software de la cátedra de Spec-First (ISFDyT 166) y la filosofía de arneses de Harness (Harness).*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![GitHub release](https://img.shields.io/badge/release-v1.0.0-green.svg)](https://github.com/jmrodev/chelo-harness)
