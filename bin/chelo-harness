@@ -21,6 +21,48 @@ if LIB_PATH not in sys.path:
 
 import chelo_channels
 
+def load_persisted_env():
+    """Carga automáticamente las claves guardadas en ~/.profile, ~/.bashrc, ~/.zshrc o .env aunque la terminal no haya hecho source."""
+    files_to_check = [
+        Path.cwd() / ".env",
+        Path.home() / ".config/fish/conf.d/secrets.fish",
+        Path.home() / ".zshrc",
+        Path.home() / ".bashrc",
+        Path.home() / ".profile"
+    ]
+    for p in files_to_check:
+        if p.exists() and p.is_file():
+            try:
+                for line in p.read_text(encoding="utf-8", errors="ignore").splitlines():
+                    line = line.strip()
+                    if not line or line.startswith("#"):
+                        continue
+                    # Match export VAR="val" o export VAR='val' o VAR=val o set -gx VAR 'val'
+                    key, val = None, None
+                    if line.startswith("export "):
+                        parts = line[7:].split("=", 1)
+                        if len(parts) == 2:
+                            key = parts[0].strip()
+                            val = parts[1].strip().strip('"').strip("'")
+                    elif line.startswith("set -gx "):
+                        parts = line[8:].split(None, 1)
+                        if len(parts) == 2:
+                            key = parts[0].strip()
+                            val = parts[1].strip().strip('"').strip("'")
+                    elif "=" in line and not line.startswith("if "):
+                        parts = line.split("=", 1)
+                        if len(parts) == 2 and parts[0].replace("_", "").isalnum():
+                            key = parts[0].strip()
+                            val = parts[1].strip().strip('"').strip("'")
+
+                    if key and val and key not in os.environ:
+                        os.environ[key] = val
+            except Exception:
+                pass
+
+# Auto-cargar variables guardadas al inicio de la ejecución
+load_persisted_env()
+
 CYAN = "\033[0;36m"
 GREEN = "\033[0;32m"
 YELLOW = "\033[1;33m"
