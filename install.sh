@@ -61,6 +61,17 @@ install_hurl() {
   echo "  ✓ Hurl instalado correctamente."
 }
 
+install_prism() {
+  echo "📦 Instalando binario oficial standalone de Prism en $BIN_DIR..."
+  PRISM_URL="https://github.com/stoplightio/prism/releases/download/v5.12.0/prism-cli-linux"
+  if [ "$OS" = "darwin" ]; then
+    PRISM_URL="https://github.com/stoplightio/prism/releases/download/v5.12.0/prism-cli-macos"
+  fi
+  curl -fsSL "$PRISM_URL" -o "$BIN_DIR/prism"
+  chmod +x "$BIN_DIR/prism"
+  echo "  ✓ Prism standalone instalado correctamente (soporte 100% offline)."
+}
+
 install_gh() {
   echo "📦 Instalando binario oficial de GitHub CLI (gh) en $BIN_DIR..."
   GH_VERSION="2.103.0"
@@ -107,11 +118,11 @@ else
   echo "  ✓ OpenCode detectado"
 fi
 
-# 4. Prism
-if command -v prism >/dev/null 2>&1; then
-  echo "  ✓ Prism CLI detectado"
+# 4. Prism (Offline Standalone)
+if [ "$UPGRADE_ALL" = true ] || (! command -v prism >/dev/null 2>&1 && [ ! -x "$BIN_DIR/prism" ]); then
+  install_prism
 else
-  echo "  ✓ Prism se ejecutará vía npx oficial de Stoplight automáticamente."
+  echo "  ✓ Prism CLI detectado"
 fi
 echo ""
 echo "🚀 ¡Listo! Ejecutá 'chelo-harness' en cualquier repositorio Git para arrancar."
