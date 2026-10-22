@@ -1,0 +1,463 @@
+#!/usr/bin/env python3
+"""
+chelo-harness — Coding-Agent Harness con Gobernanza, Sincronización Daily/Canales (Slack/GitHub),
+                Levantamiento de Requerimientos (Juan López), Spec-First / Docs-as-Code (Mermaid/OpenAPI/Hurl),
+                Prism Mock/Proxy Engine, Memoria en Engram y Orquestación.
+Autor: Juan Marcelo Rodríguez (jmrodev)
+"""
+
+import sys
+import os
+import subprocess
+import shutil
+import time
+import json
+from pathlib import Path
+
+# Inyectar librería chelo
+LIB_PATH = str(Path.home() / ".local/lib/chelo")
+if LIB_PATH not in sys.path:
+    sys.path.insert(0, LIB_PATH)
+
+import chelo_channels
+
+CYAN = "\033[0;36m"
+GREEN = "\033[0;32m"
+YELLOW = "\033[1;33m"
+RED = "\033[0;31m"
+BLUE = "\033[0;34m"
+MAGENTA = "\033[0;35m"
+BOLD = "\033[1m"
+NC = "\033[0m"
+
+MAX_ALLOWED_CHANGES = 10
+PRISM_PORT = 4010
+BACKEND_PORT = 8000
+
+def banner():
+    print(f"{CYAN}{BOLD}╔═══════════════════════════════════════════════════════════════════╗{NC}")
+    print(f"{CYAN}{BOLD}║         🛡️  CHELO-HARNESS — AGILE & CONTRACT RUNTIME               ║{NC}")
+    print(f"{CYAN}{BOLD}╚═══════════════════════════════════════════════════════════════════╝{NC}\n")
+
+def check_git_repo():
+    res = subprocess.run(["git", "rev-parse", "--is-inside-work-tree"], capture_output=True)
+    if res.returncode != 0:
+        print(f"{RED}❌ Error: chelo-harness debe ejecutarse dentro de un repositorio Git.{NC}")
+        sys.exit(1)
+
+def get_project_name():
+    try:
+        toplevel = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True).stdout.strip()
+        return Path(toplevel).name
+    except Exception:
+        return Path.cwd().name
+
+def select_option(title, options, allow_custom=True):
+    print(f"{BOLD}{CYAN}{title}{NC}")
+    for idx, opt in enumerate(options, 1):
+        print(f"  {YELLOW}{idx}){NC} {opt}")
+    if allow_custom:
+        print(f"  {YELLOW}0){NC} Otro (escribir manualmente)")
+    
+    while True:
+        try:
+            choice = input(f"{BOLD}👉 Elegí una opción [1-{len(options)}]: {NC}").strip()
+            if not choice:
+                return options[0]
+            if choice == "0" and allow_custom:
+                custom_val = input(f"   {CYAN}Escribí el valor personalizado:{NC} ").strip()
+                return custom_val if custom_val else options[0]
+            if choice.isdigit():
+                num = int(choice)
+                if 1 <= num <= len(options):
+                    return options[num - 1]
+            print(f"{RED}Opción inválida. Ingresá un número del 1 al {len(options)}.{NC}")
+        except (KeyboardInterrupt, EOFError):
+            print(f"\n{YELLOW}Operación cancelada.{NC}")
+            sys.exit(0)
+
+def prompt_text(label, default=""):
+    val = input(f"{BOLD}{CYAN}{label}{NC}\n👉 ").strip()
+    return val if val else default
+
+def audit_changes_rule():
+    res = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True)
+    lines = [l for l in res.stdout.splitlines() if l.strip()]
+    count = len(lines)
+    
+    print(f"📊 Archivos modificados en el workspace: {BOLD}{count}{NC}")
+    if count > MAX_ALLOWED_CHANGES:
+        print(f"\n{RED}{BOLD}🚨 FRENO DE SEGURIDAD (REGLA DE LOS 10 CAMBIOS){NC}")
+        print(f"{YELLOW}El cambio actual afecta a {count} archivos (límite máximo permitido: {MAX_ALLOWED_CHANGES}).{NC}")
+        print("Es muy probable que se esté abarcando más de lo pedido en el ticket/tarea.")
+        print(f"{YELLOW}Pausando ejecución para revisión humana manual antes de continuar.{NC}\n")
+        return False
+    return True
+
+def cmd_daily_sync():
+    banner()
+    print(f"{BLUE}☕ SINCRONIZACIÓN DAILY SCRUM & CANALES DEL EQUIPO{NC}\n")
+
+    # 1. Slack novedades
+    print(f"{CYAN}📡 Consultando canal #practicas de Slack...{NC}")
+    res = chelo_channels.get_slack_messages(limit=3)
+    if res.get("ok"):
+        for m in res.get("messages", []):
+            print(f"   💬 {YELLOW}{m.get('user')}{NC}: {m.get('text')[:120]}...")
+    else:
+        print(f"   {YELLOW}⚠️  Slack no disponible o sin token: {res.get('error')}{NC}")
+
+    # 2. GitHub Sprint & Milestones
+    print(f"\n{CYAN}📌 Consultando Sprint y Milestones de GitHub...{NC}")
+    if shutil.which("gh"):
+        sprint_info = chelo_channels.get_github_sprint_context()
+        m = sprint_info.get("milestone")
+        if m:
+            print(f"   🏆 {GREEN}Milestone Activo:{NC} {BOLD}{m.get('title')}{NC} (Vence: {m.get('due_on', 'N/A')})")
+            print(f"      Progreso: {m.get('closed_issues')} cerrados / {m.get('open_issues')} abiertos")
+        else:
+            print(f"   {YELLOW}No hay Milestones abiertos en este repositorio.{NC}")
+    print("")
+
+def cmd_board(action="open"):
+    banner()
+    if action == "init":
+        print(f"{BLUE}🚀 Instalando Daily Board en este repositorio...{NC}")
+        subprocess.run("curl -sL https://raw.githubusercontent.com/jmrodev/daily-board/main/install.sh | bash", shell=True)
+    else:
+        # Abrir Daily Board en el navegador
+        try:
+            repo_url = subprocess.run(["gh", "repo", "view", "--json", "url", "-q", ".url"], capture_output=True, text=True).stdout.strip()
+            if repo_url:
+                org_repo = repo_url.replace("https://github.com/", "")
+                org, repo = org_repo.split("/")
+                board_url = f"https://{org}.github.io/{repo}/"
+                print(f"{GREEN}✓ Abriendo Daily Board:{NC} {board_url}")
+                subprocess.run(["xdg-open", board_url], capture_output=True)
+            else:
+                subprocess.run(["xdg-open", "https://jmrodev.github.io/daily-board/"], capture_output=True)
+        except Exception:
+            print(f"{YELLOW}No se pudo detectar URL de GitHub Pages. Abriendo repo de Daily Board...{NC}")
+            subprocess.run(["xdg-open", "https://github.com/jmrodev/daily-board"], capture_output=True)
+
+def cmd_mock():
+    banner()
+    spec = find_openapi_spec()
+    if not spec:
+        print(f"{RED}❌ No se encontró archivo de especificación OpenAPI (*.yaml) en el repositorio.{NC}")
+        sys.exit(1)
+    print(f"{BLUE}🚀 Levantando Prism Mock Server desde:{NC} {spec}")
+    print(f"{GREEN}✓ Servidor simulado activo en:{NC} {BOLD}http://localhost:{PRISM_PORT}{NC}")
+    print(f"{YELLOW}Presioná Ctrl+C para detener el mock.{NC}\n")
+    subprocess.run(["prism", "mock", str(spec), "-p", str(PRISM_PORT), "-m"])
+
+def cmd_proxy(backend_url=f"http://localhost:{BACKEND_PORT}"):
+    banner()
+    spec = find_openapi_spec()
+    if not spec:
+        print(f"{RED}❌ No se encontró archivo OpenAPI (*.yaml) para validar el proxy.{NC}")
+        sys.exit(1)
+    print(f"{BLUE}🛡️ Levantando Prism Proxy de Validación:{NC}")
+    print(f"   • Contrato: {spec}")
+    print(f"   • Backend Real: {backend_url}")
+    print(f"   • Proxy Validador: {BOLD}http://localhost:{PRISM_PORT}{NC}\n")
+    subprocess.run(["prism", "proxy", str(spec), backend_url, "-p", str(PRISM_PORT), "--validate-request"])
+
+def cmd_test():
+    banner()
+    hurl_files = sorted(list(Path.cwd().glob("**/*.hurl")))
+    if not hurl_files:
+        print(f"{YELLOW}⚠️  No se encontraron archivos de test .hurl en el repositorio.{NC}")
+        return False
+
+    print(f"{BLUE}▶ Ejecutando {len(hurl_files)} pruebas Hurl de contrato...{NC}\n")
+    failed = 0
+    for hf in hurl_files:
+        print(f"   🧪 Testeando {hf.name}...", end=" ", flush=True)
+        res = subprocess.run(["hurl", "--test", str(hf)], capture_output=True, text=True)
+        if res.returncode == 0:
+            print(f"{GREEN}PASÓ ✓{NC}")
+        else:
+            print(f"{RED}FALLÓ ✗{NC}")
+            failed += 1
+            if res.stderr:
+                print(f"{YELLOW}{res.stderr.strip()[:300]}{NC}")
+
+    if failed == 0:
+        print(f"\n{GREEN}{BOLD}✓ TODAS LAS PRUEBAS HURL SUPERADAS SIN VIOLACIONES DE CONTRATO.{NC}\n")
+        return True
+    else:
+        print(f"\n{RED}{BOLD}❌ {failed} prueba(s) fallaron contra el contrato OpenAPI.{NC}\n")
+        return False
+
+def find_openapi_spec():
+    candidates = list(Path.cwd().glob("**/openapi.yaml")) + \
+                 list(Path.cwd().glob("**/openapi.yml")) + \
+                 list(Path.cwd().glob("**/api*.yaml"))
+    return candidates[0] if candidates else None
+
+def cmd_interactive_session():
+    banner()
+    check_git_repo()
+    project = get_project_name()
+
+    print(f"📂 Proyecto detectado: {BOLD}{GREEN}{project}{NC}\n")
+
+    # Sincronización previa opcional
+    cmd_daily_sync()
+
+    # =========================================================================
+    # FASE 0: INVESTIGACIÓN Y LEVANTAMIENTO DE REQUERIMIENTOS (JUAN LÓPEZ)
+    # =========================================================================
+    print(f"{MAGENTA}{BOLD}📋 FASE 0: INVESTIGACIÓN & LEVANTAMIENTO DE REQUERIMIENTOS{NC}")
+    print(f"{YELLOW}Antes del código y la arquitectura técnica, definimos el problema de negocio.{NC}\n")
+
+    # Ofrecer seleccionar de GitHub Issues si hay disponibles
+    selected_issue_number = None
+    if shutil.which("gh"):
+        try:
+            sprint_info = chelo_channels.get_github_sprint_context()
+            open_issues = sprint_info.get("issues", [])
+            if open_issues:
+                issue_opts = [f"#{i['number']} {i['title']}" for i in open_issues[:5]]
+                usar_gh = select_option("¿Querés asociar esta sesión a un Issue abierto de GitHub?", ["Escribir requerimiento manual"] + issue_opts, allow_custom=False)
+                if usar_gh != "Escribir requerimiento manual":
+                    selected_issue_number = usar_gh.split()[0].replace("#", "")
+                    # Marcar issue in-progress
+                    subprocess.run(["gh", "issue", "edit", selected_issue_number, "--add-label", "status:in-progress", "--remove-label", "status:todo"], capture_output=True)
+                    print(f"   {GREEN}✓ Issue #{selected_issue_number} vinculado y marcado `status:in-progress` en GitHub.{NC}\n")
+        except Exception:
+            pass
+
+    req_problema = prompt_text("1. ¿Qué problema o ineficiencia del proceso actual se quiere resolver?", "Gestión manual lenta y propensa a errores")
+    print(f"   {GREEN}✓ Problema:{NC} {req_problema}\n")
+
+    req_actores = prompt_text("2. ¿Quiénes son los actores que interactúan con el sistema? (ej: Administrador, Cliente, API)", "Administrador, Sistema API")
+    print(f"   {GREEN}✓ Actores:{NC} {req_actores}\n")
+
+    req_alcance = prompt_text("3. ¿Cuál es el alcance funcional concreto (Qué debe hacer y qué NO debe hacer)?", "CRUD de la entidad principal sin dependencias complejas")
+    print(f"   {GREEN}✓ Alcance:{NC} {req_alcance}\n")
+
+    req_criterio = prompt_text("4. ¿Cuál es el criterio de aceptación / escenario BDD clave? (Given / When / Then)", "Dado un payload válido, cuando se envíe un POST, responde 201 y el recurso creado")
+    print(f"   {GREEN}✓ Criterio de Aceptación:{NC} {req_criterio}\n")
+
+    # =========================================================================
+    # FASE 1: ENCUADRE TÉCNICO & ARQUITECTURA
+    # =========================================================================
+    print(f"{BLUE}{BOLD}🧠 FASE 1: ENCUADRE DE ARQUITECTURA & GOBERNANZA TÉCNICA{NC}\n")
+
+    tipos_tarea = [
+        "Nueva Feature / Requerimiento (OpenAPI Spec -> Hurl Test -> Mock -> Code)",
+        "Refactorización / Clean Code (Preservar contrato OpenAPI intacto)",
+        "Bugfix / Corrección (Reproducir primero con test .hurl fallido)",
+        "Infraestructura / Docker / Despliegue (Dockerfile, compose, networking)",
+        "Testing / Cobertura de Contrato (Batería Hurl y asserts sl-violations)"
+    ]
+    p_tipo = select_option("¿Qué tipo de trabajo técnico estás encarando?", tipos_tarea)
+    print(f"   {GREEN}✓ Seleccionado:{NC} {p_tipo}\n")
+
+    patrones_arq = [
+        "Spec-First / Contract-Driven (OpenAPI + Prism Mock + Hurl Tests sin BBDD inicial)",
+        "Hexagonal / Ports & Adapters (Dominio desacoplado de infraestructura)",
+        "Clean Architecture / Onion (Casos de uso y entidades puras)",
+        "Container / Presentational (UI tonta desacoplada de API)",
+        "Unix-First / CLI Pipeline (Herramientas nativas ligeras sin dependencias infladas)"
+    ]
+    p_arquitectura = select_option("¿Bajo qué patrón de arquitectura se debe desarrollar?", patrones_arq)
+    print(f"   {GREEN}✓ Seleccionado:{NC} {p_arquitectura}\n")
+
+    disciplinas_spec = [
+        "Ciclo Completo Juan López: Documentación (Actores/Alcance/Gherkin) + OpenAPI + Prism Mock (:4010) + Hurl Tests",
+        "API-First Estricto: Contrato OpenAPI (.yaml) + Prism Mock + Tests Hurl sin violaciones ('sl-violations')",
+        "TDD Backend: Endpoint en PHP/Node validado vía Prism Proxy antes de persistir",
+        "Docs-as-Code: Diagramas Mermaid (.mmd) integrados en Markdown"
+    ]
+    p_spec = select_option("¿Qué protocolo de verificación debe anteponerse al código?", disciplinas_spec)
+    print(f"   {GREEN}✓ Seleccionado:{NC} {p_spec}\n")
+
+    lenguajes = [
+        "PHP nativo modular / SQLite (Router declarativo, PDO, cero frameworks inflados)",
+        "TypeScript / Node.js (Prism, Fastify, Express o React nativo)",
+        "Python (FastAPI / Typer)",
+        "Bash / Shell Scripting (Unix tools, curl, hurl, jq)"
+    ]
+    p_lenguaje = select_option("¿Cuál es el stack / runtime base?", lenguajes)
+    print(f"   {GREEN}✓ Seleccionado:{NC} {p_lenguaje}\n")
+
+    restricciones = [
+        "REGLA DE CONTRATO (JUAN LÓPEZ): El test Hurl debe validar que no exista el header 'sl-violations'",
+        "REGLA DE TDD: Ningún endpoint en backend sin su test .hurl correspondiente",
+        "REGLA DE SIMPLICIDAD: Cero bases de datos pesadas en fase de diseño; resolver primero con mock/sqlite",
+        "REGLA DE CONTENEDOR: El proyecto debe levantarse de forma reproducible sin paquetes globales",
+        "REGLA DE CONFINAMIENTO: Modificar únicamente los archivos asociados al ticket (máx 10)"
+    ]
+    p_restriccion = select_option("¿Cuál es la restricción crítica que el agente NO puede violar?", restricciones)
+    print(f"   {GREEN}✓ Seleccionado:{NC} {p_restriccion}\n")
+
+    agentes = [
+        "OpenCode CLI (Ejecución directa en segundo plano / terminal)",
+        "OpenCode TUI (Sesión interactiva en multiplexer Herdr)",
+        "Antigravity (Copiar prompt blindado al portapapeles para AGY)",
+        "Solo registrar contexto en Engram (no disparar agente ahora)"
+    ]
+    p_agente = select_option("¿Qué agente ejecutará este trabajo?", agentes, allow_custom=False)
+    print(f"   {GREEN}✓ Seleccionado:{NC} {p_agente}\n")
+
+    # Persistir en Engram
+    topic = f"harness/{project}/{p_tipo.split('/')[0].strip().lower().replace(' ', '-')}"
+    doc_content = (
+        f"# Levantamiento de Requerimientos y Encuadre — {project}\n\n"
+        f"## 1. Análisis de Negocio (Fase 0)\n"
+        f"- **Problema**: {req_problema}\n"
+        f"- **Actores**: {req_actores}\n"
+        f"- **Alcance**: {req_alcance}\n"
+        f"- **Criterio de Aceptación (BDD)**: {req_criterio}\n"
+        f"- **GitHub Issue**: {f'#{selected_issue_number}' if selected_issue_number else 'N/A'}\n\n"
+        f"## 2. Encuadre Técnico (Fase 1)\n"
+        f"- **Tipo de Tarea**: {p_tipo}\n"
+        f"- **Patrón Arquitectónico**: {p_arquitectura}\n"
+        f"- **Protocolo Contract-First**: {p_spec}\n"
+        f"- **Stack**: {p_lenguaje}\n"
+        f"- **Restricción Crítica**: {p_restriccion}\n"
+    )
+
+    try:
+        if shutil.which("engram"):
+            p = subprocess.Popen(["engram", "set", topic], stdin=subprocess.PIPE, text=True)
+            p.communicate(input=doc_content)
+            print(f"{GREEN}✓ Memoria persistida en Engram:{NC} `{topic}`\n")
+    except Exception:
+        pass
+
+    prompt_confinado = (
+        f"ANÁLISIS DE NEGOCIO (REQUERIMIENTOS):\n"
+        f"  • PROBLEMA: {req_problema}\n"
+        f"  • ACTORES: {req_actores}\n"
+        f"  • ALCANCE: {req_alcance}\n"
+        f"  • BDD / CRITERIO: {req_criterio}\n"
+        f"{f'  • TICKET GITHUB: Closes #{selected_issue_number}' if selected_issue_number else ''}\n\n"
+        f"ARQUITECTURA: {p_arquitectura}\n"
+        f"STACK: {p_lenguaje}\n\n"
+        f"PROTOCOLO STRICT SPEC-FIRST (JUAN LÓPEZ):\n"
+        f"  1. DOCUMENTACIÓN & MODELADO: Definir casos de negocio en markdown y diagramas Mermaid (.mmd).\n"
+        f"  2. CONTRATO SAGRADO: Escribir/actualizar openapi.yaml con schemas, rutas y examples.\n"
+        f"  3. PRISM MOCK: El endpoint debe responder en http://localhost:4010 simulado por Prism sin BBDD.\n"
+        f"  4. TEST HURL: Escribir test (.hurl) con assert `header 'sl-violations' not exists`.\n"
+        f"  5. BACKEND TARDÍO: Implementar la ruta mínima en PHP/Node y SQLite solo cuando el mock pase.\n\n"
+        f"REGLA CRÍTICA: {p_restriccion}\n"
+        f"LÍMITE ESTRICTO: No modificar más de 10 archivos bajo ninguna circunstancia."
+    )
+
+    if "OpenCode CLI" in p_agente:
+        if shutil.which("opencode"):
+            print(f"\n{BLUE}🚀 Disparando OpenCode con el prompt gobernado...{NC}\n")
+            subprocess.run(["opencode", "run", prompt_confinado])
+            audit_changes_rule()
+        else:
+            print(f"{RED}❌ opencode no está en PATH.{NC}")
+
+    elif "OpenCode TUI" in p_agente:
+        if shutil.which("opencode"):
+            print(f"\n{BLUE}🚀 Abriendo OpenCode TUI en el workspace...{NC}")
+            subprocess.run(f"printf '%s' \"{prompt_confinado}\" | wl-copy", shell=True)
+            print(f"{GREEN}✓ Prompt gobernado copiado al portapapeles.{NC} Pegalo con Ctrl+V.")
+            subprocess.run(["opencode"])
+            audit_changes_rule()
+        else:
+            print(f"{RED}❌ opencode no está en PATH.{NC}")
+
+    elif "Antigravity" in p_agente:
+        subprocess.run(f"printf '%s' \"{prompt_confinado}\" | wl-copy", shell=True)
+        print(f"\n{GREEN}{BOLD}✓ Prompt gobernado generado y copiado al portapapeles.{NC}")
+        print(f"{CYAN}Pegalo directamente en tu chat con Antigravity.{NC}\n")
+        print(f"{BOLD}Contenido del marco:{NC}")
+        print(f"--------------------------------------------------")
+        print(prompt_confinado)
+        print(f"--------------------------------------------------")
+
+def cmd_gate():
+    banner()
+    check_git_repo()
+    print(f"{BLUE}Iniciando Quality Gate en:{NC} {Path.cwd()}\n")
+
+    if not audit_changes_rule():
+        sys.exit(2)
+
+    cmd_test()
+
+    if shutil.which("gga"):
+        print(f"\n{BLUE}▶ Ejecutando auditoría de riesgos con GGA...{NC}")
+        gga_res = subprocess.run(["gga", "review", "--staged"], capture_output=True, text=True)
+        if gga_res.returncode == 0:
+            print(f"{GREEN}✓ Auditoría GGA aprobada sin riesgos críticos.{NC}")
+        else:
+            print(f"{YELLOW}⚠️  Aviso GGA:{NC}\n{gga_res.stdout[:300]}")
+
+    print(f"\n{GREEN}{BOLD}✓ QUALITY GATE SUPERADO EXITOSAMENTE.{NC}")
+
+def cmd_commit(message):
+    banner()
+    check_git_repo()
+
+    if not audit_changes_rule():
+        sys.exit(2)
+
+    if "Co-Authored-By" in message or "AI" in message:
+        print(f"{RED}❌ Error de gobernanza: Prohibido incluir atribución de IA o Co-Authored-By en el commit.{NC}")
+        sys.exit(1)
+
+    print(f"▶ Commiteando cambios con mensaje convencional: {BOLD}{message}{NC}")
+    subprocess.run(["git", "add", "."])
+    res = subprocess.run(["git", "commit", "-m", message])
+    if res.returncode == 0:
+        print(f"{GREEN}✓ Commit exitoso.{NC}")
+
+def print_help():
+    banner()
+    print("COMANDOS DISPONIBLES:")
+    print("  chelo-harness                   Inicia sesión ágil (Daily Sync -> Requerimientos -> Agente)")
+    print("  chelo-harness sync              Sincronización Daily Scrum (Slack #practicas + Milestones GitHub)")
+    print("  chelo-harness board [open|init] Abre el Daily Board o inyecta su GitHub Pages con one-liner")
+    print("  chelo-harness mock              Levanta Prism Mock Server (:4010) leyendo el openapi.yaml")
+    print("  chelo-harness proxy [url]       Levanta Prism Proxy validador contra backend real (:8000)")
+    print("  chelo-harness test              Ejecuta la suite de pruebas Hurl (*.hurl) contra el contrato")
+    print("  chelo-harness gate              Ejecuta Quality Gate completo (10 cambios, Hurl, GGA)")
+    print("  chelo-harness commit \"<msg>\"    Commitea con validaciones de gobernanza pre-commit")
+    print("  chelo-harness status            Inspecciona el estado del workspace bajo las reglas de Chelo")
+
+def main():
+    if len(sys.argv) == 1:
+        cmd_interactive_session()
+        sys.exit(0)
+
+    cmd = sys.argv[1]
+    if cmd in ["ask", "learn", "start", "run", "menu"]:
+        cmd_interactive_session()
+    elif cmd in ["sync", "daily", "novedades"]:
+        cmd_daily_sync()
+    elif cmd == "board":
+        sub = sys.argv[2] if len(sys.argv) > 2 else "open"
+        cmd_board(sub)
+    elif cmd == "mock":
+        cmd_mock()
+    elif cmd == "proxy":
+        backend = sys.argv[2] if len(sys.argv) > 2 else f"http://localhost:{BACKEND_PORT}"
+        cmd_proxy(backend)
+    elif cmd == "test":
+        cmd_test()
+    elif cmd == "gate":
+        cmd_gate()
+    elif cmd == "commit":
+        if len(sys.argv) < 3:
+            print(f"{RED}Falta el mensaje de commit. Uso: chelo-harness commit \"tipo(scope): mensaje\"{NC}")
+            sys.exit(1)
+        cmd_commit(sys.argv[2])
+    elif cmd == "status":
+        banner()
+        check_git_repo()
+        audit_changes_rule()
+    else:
+        print_help()
+
+if __name__ == "__main__":
+    main()
