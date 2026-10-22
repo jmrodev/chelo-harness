@@ -234,39 +234,48 @@ jsonpath "$.status" == "ok"
     print(f"  2. {YELLOW}chelo-harness test{NC}    (Ejecuta tests/000_health.hurl)")
     print("")
 
-def cmd_doctor():
+def ensure_tool_installed(tool_name):
+    """Instala o repara automáticamente una herramienta si falta en el sistema."""
+    print(f"📦 {YELLOW}Instalando automáticamente {tool_name} para el sistema...{NC}")
+    cmd = f"curl -fsSL https://raw.githubusercontent.com/jmrodev/chelo-harness/main/install.sh?v=$(date +%s) | bash"
+    subprocess.run(cmd, shell=True)
+
+def cmd_doctor(auto_fix=False):
     banner()
     print(f"{BLUE}🔍 CHEQUEO DE ENTORNO, HERRAMIENTAS Y CLAVES (DOCTOR){NC}\n")
 
-    # 1. GitHub CLI
-    if shutil.which("gh"):
-        gh_status = subprocess.run(["gh", "auth", "status"], capture_output=True, text=True)
-        if gh_status.returncode == 0:
-            print(f"  {GREEN}✓ GitHub CLI (gh):{NC} Autenticado correctamente.")
-        else:
-            print(f"  {YELLOW}⚠️  GitHub CLI (gh):{NC} Instalado pero NO autenticado. Ejecutá: {BOLD}gh auth login{NC}")
-    else:
-        print(f"  {RED}✗ GitHub CLI (gh):{NC} No instalado. (Requerido para Daily Board y Milestones)")
+    # Si se pide auto_fix o faltan herramientas críticas, chelo-harness las instala solo
+    needs_fix = False
 
-    # 2. Spec & Testing Tools
+    # 1. Hurl
+    hurl_runner = find_hurl_runner()
+    if hurl_runner:
+        print(f"  {GREEN}✓ Hurl:{NC} Instalado y listo ({hurl_runner}).")
+    else:
+        print(f"  {YELLOW}○ Hurl no detectado.{NC}")
+        ensure_tool_installed("Hurl")
+
+    # 2. GitHub CLI
+    if shutil.which("gh") or (Path.home() / ".local/bin/gh").is_file():
+        print(f"  {GREEN}✓ GitHub CLI (gh):{NC} Instalado.")
+    else:
+        print(f"  {YELLOW}○ GitHub CLI (gh) no detectado.{NC}")
+        ensure_tool_installed("GitHub CLI")
+
+    # 3. OpenCode
+    if shutil.which("opencode") or (Path.home() / ".local/bin/opencode").is_file():
+        print(f"  {GREEN}✓ OpenCode CLI:{NC} Instalado y listo para ejecución TDD.")
+    else:
+        print(f"  {YELLOW}○ OpenCode no detectado.{NC}")
+        ensure_tool_installed("OpenCode")
+
+    # 4. Prism
     prism_runner = find_prism_runner()
     if prism_runner:
         runner_name = " ".join(prism_runner)
         print(f"  {GREEN}✓ Prism:{NC} Disponible ({runner_name}) para mock/proxy de OpenAPI.")
     else:
-        print(f"  {GREEN}✓ Mock Server Nativo:{NC} Disponible en Python puro (sin dependencias de Node).")
-
-    hurl_runner = find_hurl_runner()
-    if hurl_runner:
-        print(f"  {GREEN}✓ Hurl:{NC} Disponible ({hurl_runner}) para Contract Testing.")
-    else:
-        print(f"  {GREEN}✓ Test Runner Nativo:{NC} Disponible en Python puro (HTTP assert).")
-
-    # 3. Agentes de Código
-    if shutil.which("opencode"):
-        print(f"  {GREEN}✓ OpenCode CLI:{NC} Instalado y listo para ejecución TDD.")
-    else:
-        print(f"  {YELLOW}⚠️  OpenCode:{NC} No detectado en PATH.")
+        print(f"  {GREEN}✓ Mock Server Nativo:{NC} Disponible en Python puro.")
 
     if shutil.which("agy"):
         print(f"  {GREEN}✓ Antigravity CLI (AGY):{NC} Instalado.")
