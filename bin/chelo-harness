@@ -219,10 +219,22 @@ def cmd_setup():
     current_ant = os.environ.get("ANTHROPIC_API_KEY")
     if current_ant == "DISABLED":
         print(f"  {YELLOW}○ Anthropic:{NC} Marcado como NO UTILIZADO.")
+        rec_a = input("   ¿Querés habilitar Anthropic y cargar una clave? [s/N]: ").strip().lower()
+        if rec_a == "s":
+            current_ant = None
     elif current_ant:
         print(f"  {GREEN}✓ Anthropic API Key detectada:{NC} {current_ant[:4]}...{current_ant[-4:]}")
-    else:
-        val = input(f"👉 Pegá tu Anthropic API Key [o 'no' para desactivar / Enter para omitir]: ").strip()
+        reconf_a = input(f"   ¿Querés conservarla (Enter/o), cambiarla (c) o desactivarla (n)? [O/c/n]: ").strip().lower()
+        if reconf_a == "n":
+            save_key_to_shells("ANTHROPIC_API_KEY", "DISABLED")
+            print(f"   {YELLOW}✓ Anthropic marcado como NO UTILIZADO.{NC}")
+            current_ant = "DISABLED"
+        elif reconf_a != "c":
+            print(f"   {GREEN}✓ Conservada.{NC}")
+
+    if not current_ant or current_ant not in [os.environ.get("ANTHROPIC_API_KEY"), "DISABLED"]:
+        print(f"🔗 {YELLOW}Obtené tu clave de Claude acá:{NC} {BOLD}https://console.anthropic.com/settings/keys{NC}")
+        val = input(f"👉 Pegá tu Anthropic API Key (sk-ant-...) [o 'no' para desactivar / Enter para omitir]: ").strip()
         if val.lower() in ["no", "n", "disable"]:
             save_key_to_shells("ANTHROPIC_API_KEY", "DISABLED")
             print(f"   {YELLOW}✓ Anthropic marcado como NO UTILIZADO.{NC}")
@@ -231,14 +243,26 @@ def cmd_setup():
             print(f"   {GREEN}✓ Anthropic configurado.{NC}")
 
     # 3. OPENAI
-    print(f"\n{CYAN}--- OPENAI (Opcional) ---{NC}")
+    print(f"\n{CYAN}--- OPENAI / CHATGPT (Opcional) ---{NC}")
     current_oai = os.environ.get("OPENAI_API_KEY")
     if current_oai == "DISABLED":
         print(f"  {YELLOW}○ OpenAI:{NC} Marcado como NO UTILIZADO.")
+        rec_o = input("   ¿Querés habilitar OpenAI y cargar una clave? [s/N]: ").strip().lower()
+        if rec_o == "s":
+            current_oai = None
     elif current_oai:
         print(f"  {GREEN}✓ OpenAI API Key detectada:{NC} {current_oai[:4]}...{current_oai[-4:]}")
-    else:
-        val = input(f"👉 Pegá tu OpenAI API Key [o 'no' para desactivar / Enter para omitir]: ").strip()
+        reconf_o = input(f"   ¿Querés conservarla (Enter/o), cambiarla (c) o desactivarla (n)? [O/c/n]: ").strip().lower()
+        if reconf_o == "n":
+            save_key_to_shells("OPENAI_API_KEY", "DISABLED")
+            print(f"   {YELLOW}✓ OpenAI marcado como NO UTILIZADO.{NC}")
+            current_oai = "DISABLED"
+        elif reconf_o != "c":
+            print(f"   {GREEN}✓ Conservada.{NC}")
+
+    if not current_oai or current_oai not in [os.environ.get("OPENAI_API_KEY"), "DISABLED"]:
+        print(f"🔗 {YELLOW}Obtené tu clave de OpenAI acá:{NC} {BOLD}https://platform.openai.com/api-keys{NC}")
+        val = input(f"👉 Pegá tu OpenAI API Key (sk-...) [o 'no' para desactivar / Enter para omitir]: ").strip()
         if val.lower() in ["no", "n", "disable"]:
             save_key_to_shells("OPENAI_API_KEY", "DISABLED")
             print(f"   {YELLOW}✓ OpenAI marcado como NO UTILIZADO.{NC}")
