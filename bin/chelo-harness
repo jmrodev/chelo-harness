@@ -142,82 +142,135 @@ def audit_changes_rule():
         return False
     return True
 
-def cmd_setup():
-    banner()
-    print(f"{BLUE}🔑 ASISTENTE UNIVERSAL DE CONFIGURACIÓN DE CLAVES (SETUP){NC}\n")
-
-    current_gemini = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY") or os.environ.get("GOOGLE_GENERATIVE_AI_API_KEY")
-    if current_gemini:
-        print(f"  {GREEN}✓ Google Gemini API Key ya detectada:{NC} {current_gemini[:4]}...{current_gemini[-4:]}")
-        reconf = input(f"   ¿Querés reconfigurarla? [s/N]: ").strip().lower()
-        if reconf != "s":
-            print(f"\n{GREEN}✓ Configuración conservada.{NC}")
-            return
-
-    print(f"{CYAN}OpenCode y Antigravity utilizan modelos como Gemini Flash (gratuito) para tareas de código.{NC}")
-    print(f"\n{BOLD}{MAGENTA}📖 PASO A PASO PARA CONSEGUIR TU GOOGLE GEMINI API KEY GRATIS:{NC}")
-    print(f"  1. Abrí en tu navegador: {BOLD}{YELLOW}https://aistudio.google.com/app/apikey{NC}")
-    print(f"  2. Iniciá sesión con tu cuenta de Google (Gmail).")
-    print(f"  3. Hacé clic en el botón azul {BOLD}'Create API key'{NC} (o 'Crear clave de API').")
-    print(f"  4. Seleccioná cualquier proyecto existente o elegí 'Create API key in new project'.")
-    print(f"  5. Copiá el texto de la clave generada (empieza con 'AIzaSy...').")
-    print(f"  6. Pegala a continuación en esta terminal.\n")
-
-    print(f"{BOLD}{MAGENTA}📖 TOKENS DE SLACK (OPCIONAL PARA SINCRONIZAR #PRACTICAS):{NC}")
-    print(f"  • Si participás de la daily en Slack, creá un Bot en: {BOLD}{YELLOW}https://api.slack.com/apps{NC}")
-    print(f"  • Permisos recomendados: channels:history, channels:read\n")
-
-    key = input(f"{BOLD}👉 Pegá tu Google Gemini API Key acá (o Enter para omitir): {NC}").strip()
-    if not key:
-        print(f"{YELLOW}Omitido. Podés configurarla luego ejecutando 'chelo-harness setup'.{NC}")
-        return
-
-    # Detectar shell y guardar persistentemente de forma universal
+def save_key_to_shells(var_name, key_val):
+    """Guarda una variable de forma universal en los archivos de perfil del usuario."""
     home = Path.home()
     user_shell = os.environ.get("SHELL", "")
 
-    # 1. Si usa Fish
+    # 1. Fish
     if "fish" in user_shell or (home / ".config/fish").exists():
         fish_secrets = home / ".config/fish/conf.d/secrets.fish"
         fish_secrets.parent.mkdir(parents=True, exist_ok=True)
         with open(fish_secrets, "a", encoding="utf-8") as f:
-            f.write(f"\nset -gx GEMINI_API_KEY '{key}'\nset -gx GOOGLE_GENERATIVE_AI_API_KEY '{key}'\n")
-        print(f"  {GREEN}✓ Guardada en Fish:{NC} {fish_secrets}")
+            f.write(f"\nset -gx {var_name} '{key_val}'\n")
 
-    # 2. Si usa Zsh
+    # 2. Zsh
     zshrc = home / ".zshrc"
     if "zsh" in user_shell or zshrc.exists():
         with open(zshrc, "a", encoding="utf-8") as f:
-            f.write(f"\nexport GEMINI_API_KEY=\"{key}\"\nexport GOOGLE_GENERATIVE_AI_API_KEY=\"{key}\"\n")
-        print(f"  {GREEN}✓ Guardada en Zsh:{NC} {zshrc}")
+            f.write(f"\nexport {var_name}=\"{key_val}\"\n")
 
-    # 3. Universal Linux / Mac (~/.profile y ~/.bashrc)
+    # 3. Bash & Profile
     bashrc = home / ".bashrc"
     if bashrc.exists():
         with open(bashrc, "a", encoding="utf-8") as f:
-            f.write(f"\nexport GEMINI_API_KEY=\"{key}\"\nexport GOOGLE_GENERATIVE_AI_API_KEY=\"{key}\"\n")
-        print(f"  {GREEN}✓ Guardada en Bash:{NC} {bashrc}")
+            f.write(f"\nexport {var_name}=\"{key_val}\"\n")
 
     profile = home / ".profile"
     with open(profile, "a", encoding="utf-8") as f:
-        f.write(f"\nexport GEMINI_API_KEY=\"{key}\"\nexport GOOGLE_GENERATIVE_AI_API_KEY=\"{key}\"\n")
-    print(f"  {GREEN}✓ Guardada en perfil universal:{NC} {profile}")
+        f.write(f"\nexport {var_name}=\"{key_val}\"\n")
 
-    # 3. Fallback local en .env si estamos en un repo
+    # 4. Local .env si existe repo
     local_env = Path.cwd() / ".env"
     with open(local_env, "a", encoding="utf-8") as f:
-        f.write(f"\nGEMINI_API_KEY=\"{key}\"\nGOOGLE_GENERATIVE_AI_API_KEY=\"{key}\"\n")
-    print(f"  {GREEN}✓ Guardada en .env local:{NC} {local_env}")
+        f.write(f"\n{var_name}=\"{key_val}\"\n")
 
-    os.environ["GEMINI_API_KEY"] = key
-    os.environ["GOOGLE_GENERATIVE_AI_API_KEY"] = key
-    print(f"\n{GREEN}{BOLD}✓ Clave configurada y activa para esta sesión.{NC}\n")
+    os.environ[var_name] = key_val
 
-    # Asegurar que OpenCode esté instalado durante el setup
-    if not shutil.which("opencode") and not (home / ".local/bin/opencode").is_file():
-        print(f"{CYAN}Instalando OpenCode CLI para que quede listo con tu nueva clave...{NC}")
+def cmd_setup():
+    banner()
+    print(f"{BLUE}🔑 ASISTENTE UNIVERSAL DE CONFIGURACIÓN DE CLAVES (SETUP){NC}\n")
+    print("Podés configurar, omitir o indicar explícitamente que no vas a usar un proveedor.")
+    print(f"{YELLOW}Tip: Para reconfigurar en cualquier momento corré 'chelo-harness setup'.{NC}\n")
+
+    # 1. GOOGLE GEMINI
+    current_gemini = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY") or os.environ.get("GOOGLE_GENERATIVE_AI_API_KEY")
+    if current_gemini == "DISABLED":
+        print(f"  {YELLOW}○ Google Gemini:{NC} Marcado explícitamente como NO UTILIZADO.")
+        rec = input("   ¿Querés habilitarlo y cargar una clave? [s/N]: ").strip().lower()
+        if rec == "s":
+            current_gemini = None
+    elif current_gemini:
+        print(f"  {GREEN}✓ Google Gemini API Key detectada:{NC} {current_gemini[:4]}...{current_gemini[-4:]}")
+        reconf = input(f"   ¿Querés conservarla (Enter/o), cambiarla (c) o desactivarla (n)? [O/c/n]: ").strip().lower()
+        if reconf == "n":
+            save_key_to_shells("GEMINI_API_KEY", "DISABLED")
+            save_key_to_shells("GOOGLE_GENERATIVE_AI_API_KEY", "DISABLED")
+            print(f"   {YELLOW}✓ Marcado como NO UTILIZADO.{NC}")
+            current_gemini = "DISABLED"
+        elif reconf != "c":
+            print(f"   {GREEN}✓ Conservada.{NC}")
+
+    if not current_gemini or current_gemini not in [os.environ.get("GEMINI_API_KEY"), "DISABLED"]:
+        print(f"\n{CYAN}--- GOOGLE GEMINI (Modelos gratuitos para OpenCode) ---{NC}")
+        print(f"🔗 Clave gratis en: {BOLD}{YELLOW}https://aistudio.google.com/app/apikey{NC}")
+        val = input(f"👉 Pegá tu clave [o escribí 'no' para no usarla / Enter para omitir]: ").strip()
+        if val.lower() in ["no", "n", "disable"]:
+            save_key_to_shells("GEMINI_API_KEY", "DISABLED")
+            save_key_to_shells("GOOGLE_GENERATIVE_AI_API_KEY", "DISABLED")
+            print(f"   {YELLOW}✓ Google Gemini marcado como NO UTILIZADO.{NC}")
+        elif val:
+            save_key_to_shells("GEMINI_API_KEY", val)
+            save_key_to_shells("GOOGLE_GENERATIVE_AI_API_KEY", val)
+            print(f"   {GREEN}✓ Google Gemini configurado.{NC}")
+
+    # 2. ANTHROPIC (CLAUDE)
+    print(f"\n{CYAN}--- ANTHROPIC / CLAUDE (Opcional) ---{NC}")
+    current_ant = os.environ.get("ANTHROPIC_API_KEY")
+    if current_ant == "DISABLED":
+        print(f"  {YELLOW}○ Anthropic:{NC} Marcado como NO UTILIZADO.")
+    elif current_ant:
+        print(f"  {GREEN}✓ Anthropic API Key detectada:{NC} {current_ant[:4]}...{current_ant[-4:]}")
+    else:
+        val = input(f"👉 Pegá tu Anthropic API Key [o 'no' para desactivar / Enter para omitir]: ").strip()
+        if val.lower() in ["no", "n", "disable"]:
+            save_key_to_shells("ANTHROPIC_API_KEY", "DISABLED")
+            print(f"   {YELLOW}✓ Anthropic marcado como NO UTILIZADO.{NC}")
+        elif val:
+            save_key_to_shells("ANTHROPIC_API_KEY", val)
+            print(f"   {GREEN}✓ Anthropic configurado.{NC}")
+
+    # 3. OPENAI
+    print(f"\n{CYAN}--- OPENAI (Opcional) ---{NC}")
+    current_oai = os.environ.get("OPENAI_API_KEY")
+    if current_oai == "DISABLED":
+        print(f"  {YELLOW}○ OpenAI:{NC} Marcado como NO UTILIZADO.")
+    elif current_oai:
+        print(f"  {GREEN}✓ OpenAI API Key detectada:{NC} {current_oai[:4]}...{current_oai[-4:]}")
+    else:
+        val = input(f"👉 Pegá tu OpenAI API Key [o 'no' para desactivar / Enter para omitir]: ").strip()
+        if val.lower() in ["no", "n", "disable"]:
+            save_key_to_shells("OPENAI_API_KEY", "DISABLED")
+            print(f"   {YELLOW}✓ OpenAI marcado como NO UTILIZADO.{NC}")
+        elif val:
+            save_key_to_shells("OPENAI_API_KEY", val)
+            print(f"   {GREEN}✓ OpenAI configurado.{NC}")
+
+    # 4. SLACK
+    print(f"\n{CYAN}--- SLACK #PRACTICAS (Opcional para Daily Scrum) ---{NC}")
+    current_slack = os.environ.get("SLACK_BOT_TOKEN") or os.environ.get("SLACK_USER_TOKEN")
+    if current_slack == "DISABLED":
+        print(f"  {YELLOW}○ Slack:{NC} Marcado como NO UTILIZADO.")
+    elif current_slack:
+        print(f"  {GREEN}✓ Slack Token detectado.{NC}")
+    else:
+        print(f"🔗 Bot Tokens en: {BOLD}{YELLOW}https://api.slack.com/apps{NC}")
+        val = input(f"👉 Pegá tu SLACK_BOT_TOKEN [o 'no' para desactivar / Enter para omitir]: ").strip()
+        if val.lower() in ["no", "n", "disable"]:
+            save_key_to_shells("SLACK_BOT_TOKEN", "DISABLED")
+            print(f"   {YELLOW}✓ Slack marcado como NO UTILIZADO.{NC}")
+        elif val:
+            save_key_to_shells("SLACK_BOT_TOKEN", val)
+            print(f"   {GREEN}✓ Slack configurado.{NC}")
+
+    # Asegurar OpenCode
+    home = Path.home()
+    if not shutil.which("opencode") and not (home / ".local/bin/opencode").is_file() and not (home / ".opencode/bin/opencode").is_file():
+        print(f"\n{CYAN}Instalando OpenCode CLI para que quede listo...{NC}")
         subprocess.run("curl -fsSL https://opencode.ai/install | bash", shell=True)
-        print(f"  {GREEN}✓ OpenCode instalado exitosamente.{NC}\n")
+
+    print(f"\n{GREEN}{BOLD}✓ Configuración completada.{NC}")
+    print(f"{YELLOW}Podés volver a modificar cualquier clave corriendo: chelo-harness setup{NC}\n")
 
 def cmd_init():
     banner()
@@ -365,7 +418,9 @@ def cmd_doctor(auto_fix=False):
     }
     print(f"\n{CYAN}🔑 Estado de API Keys detectadas en el entorno:{NC}")
     for k, val in keys.items():
-        if val:
+        if val == "DISABLED":
+            print(f"  {YELLOW}○ {k}:{NC} No se utiliza (desactivada explícitamente)")
+        elif val:
             print(f"  {GREEN}✓ {k}:{NC} Configurada ({val[:4]}...{val[-4:] if len(val)>8 else ''})")
         else:
             print(f"  {YELLOW}○ {k}:{NC} No configurada (ejecutá 'chelo-harness setup' para configurarla)")
