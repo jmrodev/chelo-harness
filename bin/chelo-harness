@@ -137,6 +137,13 @@ def prompt_text(label, default=""):
     val = input(f"{BOLD}{CYAN}{label}{NC}\n👉 ").strip()
     return val if val else default
 
+def show_diff_viewer():
+    """Muestra diffs y archivos usando bat/less de forma paginada y ligera (sin abrir jamás nvim)."""
+    if shutil.which("bat"):
+        subprocess.run("git diff --color=always | bat --paging=always", shell=True)
+    else:
+        subprocess.run(["git", "diff"])
+
 def audit_changes_rule():
     res = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True)
     lines = [l for l in res.stdout.splitlines() if l.strip()]
@@ -1066,7 +1073,7 @@ def cmd_agent(role):
                 subprocess.run(["git", "diff", "--stat"])
                 sub_choice = input(f"\n¿Querés ver el diff completo? [s/N]: ").strip().lower()
                 if sub_choice == "s":
-                    subprocess.run(["git", "diff"])
+                    show_diff_viewer()
                 aprob = input(f"{BOLD}¿Aprobás continuar a la fase de pruebas? [S/n]: {NC}").strip().lower()
                 if aprob == "n":
                     print(f"{YELLOW}Ejecución pausada por el usuario.{NC}")
@@ -1231,7 +1238,7 @@ def handle_graceful_interrupt(signum, frame):
     try:
         op = input(f"\n{BOLD}Seleccioná [1-4] (Default: 1): {NC}").strip()
         if op == "2":
-            subprocess.run(["git", "diff"])
+            show_diff_viewer()
         elif op == "3":
             subprocess.run(["git", "restore", "."])
             smooth_print(f"{GREEN}✓ Workspace restablecido.{NC}")
