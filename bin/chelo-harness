@@ -1182,6 +1182,40 @@ def cmd_interactive_session():
                             smooth_print(f"{YELLOW}⚠️  Aviso al parsear artefactos automáticos: {ex}{NC}")
                     else:
                         smooth_print(f"{RED}Error generando artefactos: {art_resp.get('error')}{NC}")
+
+                # DISPARAR BACKEND-DEV CUANDO EL USUARIO LO ELIJA
+                backend_triggers = ["1", "backend", "backend-dev", "back"]
+                if artifacts_already_generated and (user_input.lower().strip() in backend_triggers or "backend-dev" in reply_turn.lower()):
+                    if not (Path.cwd() / "backend").exists() and not (Path.cwd() / "server.py").exists() and not (Path.cwd() / "server.js").exists():
+                        smooth_print(f"\n{BOLD}{BLUE}🚀 [BACKEND-DEV] Materializando servidor backend real contra openapi.yaml...{NC}\n", 0.05)
+                        back_system = get_agent_prompt("backend-dev")
+                        back_spec = (Path.cwd() / "openapi.yaml").read_text(encoding="utf-8") if (Path.cwd() / "openapi.yaml").exists() else ""
+                        back_story = s_path.read_text(encoding="utf-8") if 's_path' in locals() and s_path.exists() else ""
+
+                        back_prompt = (
+                            f"{back_system}\n\n"
+                            f"Contrato OpenAPI actual:\n```yaml\n{back_spec[:1500]}\n```\n\n"
+                            f"Historia BDD:\n```markdown\n{back_story[:1000]}\n```\n\n"
+                            f"Creá el servidor mínimo ejecutable en Python (FastAPI o http.server nativo) que corra en el puerto :8000 "
+                            f"y responda exactamente a los endpoints definidos en el contrato.\n"
+                            f"Devolvé ÚNICAMENTE un JSON válido (sin backticks) con:\n"
+                            f'{{\n  "file_path": "server.py",\n  "file_content": "..."\n}}'
+                        )
+                        back_resp = chelo_gemini_client.generate_content(back_prompt)
+                        if back_resp.get("ok"):
+                            raw_b = back_resp['text'].strip()
+                            if raw_b.startswith("```"):
+                                import re
+                                raw_b = re.sub(r"^```[a-z]*\n", "", raw_b)
+                                raw_b = re.sub(r"\n```$", "", raw_b)
+                            try:
+                                b_data = json.loads(raw_b)
+                                b_file = Path.cwd() / b_data.get("file_path", "server.py")
+                                b_file.write_text(b_data.get("file_content", ""), encoding="utf-8")
+                                smooth_print(f"  {GREEN}✓ [Backend-Dev]{NC} Servidor implementado en {CYAN}{b_file.name}{NC}")
+                                smooth_print(f"  {GREEN}✓ [Backend-Dev]{NC} Probando proxy de validación...")
+                            except Exception as ex:
+                                smooth_print(f"{YELLOW}Aviso al escribir backend: {ex}{NC}")
             else:
                 smooth_print(f"{RED}Error: {resp_turn.get('error')}{NC}")
                 conversation_history.pop()
