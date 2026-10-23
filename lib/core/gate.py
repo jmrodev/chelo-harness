@@ -11,10 +11,12 @@ from lib.ui.console import RED, GREEN, YELLOW, CYAN, BOLD, NC, smooth_print
 MAX_ALLOWED_CHANGES = 10
 
 def check_git_repo():
+    """Verifica si es un repo git. Si no lo es, auto-inicializa el entorno Spec-First automáticamente."""
     res = subprocess.run(["git", "rev-parse", "--is-inside-work-tree"], capture_output=True, text=True)
     if res.returncode != 0:
-        smooth_print(f"{RED}Error: chelo-harness debe ejecutarse dentro de un repositorio Git.{NC}")
-        sys.exit(1)
+        smooth_print(f"{YELLOW}⚡ Workspace no inicializado con Git. Auto-inicializando entorno Spec-First...{NC}\n", 0.05)
+        from lib.core.init_project import cmd_init
+        cmd_init()
 
 def get_git_status():
     res = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True)
