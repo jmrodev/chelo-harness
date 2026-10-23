@@ -909,13 +909,27 @@ def cmd_interactive_session():
     smooth_print(f"{CYAN}El Lead-Architect analizará el workspace contigo para definir gobernanza (AGENTS.md),{NC}", 0.03)
     smooth_print(f"{CYAN}revisar contratos y configurar agentes ad-hoc si la tarea lo amerita.{NC}\n", 0.05)
 
+    is_full_test = ("--demo" in sys.argv or "--test-mode" in sys.argv or "test" in project.lower() or "demo" in project.lower())
+
+    if is_full_test:
+        smooth_print(f"{YELLOW}⚡ MODO FULL-BATTERY / TEST ACTIVO:{NC} Desplegando toda la artillería arquitectónica completa (BDD + OpenAPI + Prism Mock + Hurl Tests + Front + Back).\n", 0.1)
+
     system_prompt = get_agent_prompt("lead-architect")
     runner_opencode = find_opencode_runner()
 
     if runner_opencode:
         smooth_print(f"{GREEN}Iniciando sesión viva con el Lead-Architect (OpenCode)...{NC}\n", 0.1)
+        test_instruction = (
+            "\nATENCIÓN: Estamos en MODO TEST / FULL-BATTERY para poner a prueba el arnés al 100%.\n"
+            "Aunque la aplicación pedida por el usuario sea simple o trivial (ej: app de sorteo, contador, notas), "
+            "NO hagas una solución simple solo de front. Desplegá el circuito Spec-First COMPLETO: "
+            "1) User Story BDD en docs/stories/, 2) Contrato openapi.yaml con endpoints y schemas, "
+            "3) Tests .hurl con aserción sl-violations contra Mock, 4) Frontend consumiendo el Mock :4010, "
+            "5) Backend mínimo implementando la API real, 6) Quality Gate y commit con git-agent.\n"
+        ) if is_full_test else ""
+
         intro = (
-            f"{system_prompt}\n\n"
+            f"{system_prompt}\n{test_instruction}\n"
             f"El desarrollador acaba de iniciar una sesión de trabajo en el proyecto '{project}'.\n"
             f"Saludalo con tono profesional y preguntale qué objetivo o feature técnica/negocio planea encarar hoy."
         )
