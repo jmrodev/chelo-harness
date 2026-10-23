@@ -965,63 +965,37 @@ def cmd_interactive_session():
     else:
         agent_engine = find_agent_runner()
         if agent_engine:
-        engine_label = "Antigravity CLI (AGY)" if agent_engine == "agy" else "OpenCode"
-        smooth_print(f"{GREEN}Iniciando sesión viva con el Lead-Architect ({engine_label})...{NC}\n", 0.1)
-        test_instruction = (
-            "\nATENCIÓN: Estamos en MODO TEST / FULL-BATTERY para poner a prueba el arnés al 100%.\n"
-            "Aunque la aplicación pedida por el usuario sea simple o trivial (ej: app de sorteo, contador, notas), "
-            "NO hagas una solución simple solo de front. Desplegá el circuito Spec-First COMPLETO: "
-            "1) User Story BDD en docs/stories/, 2) Contrato openapi.yaml con endpoints y schemas, "
-            "3) Tests .hurl con aserción sl-violations contra Mock, 4) Frontend consumiendo el Mock :4010, "
-            "5) Backend mínimo implementando la API real, 6) Quality Gate y commit con git-agent.\n"
-        ) if is_full_test else ""
+            engine_label = "Antigravity CLI (AGY)" if agent_engine == "agy" else "OpenCode"
+            smooth_print(f"{GREEN}Iniciando sesión viva con el Lead-Architect ({engine_label})...{NC}\n", 0.1)
+            test_instruction = (
+                "\nATENCIÓN: Estamos en MODO TEST / FULL-BATTERY para poner a prueba el arnés al 100%.\n"
+                "Aunque la aplicación pedida por el usuario sea simple o trivial (ej: app de sorteo, contador, notas), "
+                "NO hagas una solución simple solo de front. Desplegá el circuito Spec-First COMPLETO: "
+                "1) User Story BDD en docs/stories/, 2) Contrato openapi.yaml con endpoints y schemas, "
+                "3) Tests .hurl con aserción sl-violations contra Mock, 4) Frontend consumiendo el Mock :4010, "
+                "5) Backend mínimo implementando la API real, 6) Quality Gate y commit con git-agent.\n"
+            ) if is_full_test else ""
 
-        intro = (
-            f"{system_prompt}\n{test_instruction}\n"
-            f"El desarrollador acaba de iniciar una sesión de trabajo en el proyecto '{project}'.\n"
-            f"Saludalo con tono profesional y preguntale qué objetivo o feature técnica/negocio planea encarar hoy."
-        )
-        try:
-            if agent_engine == "agy":
-                subprocess.run(["agy", "--prompt-interactive", intro])
-            else:
-                subprocess.run(["opencode", "run", intro])
-        except KeyboardInterrupt:
-            pass
-        audit_changes_rule()
-
-        # Si el usuario eligió Dashboard TUI (4), ejecutar el monitor multi-panel de hitos
-        if view_mode == "dashboard" and ui_dashboard:
+            intro = (
+                f"{system_prompt}\n{test_instruction}\n"
+                f"El desarrollador acaba de iniciar una sesión de trabajo en el proyecto '{project}'.\n"
+                f"Saludalo con tono profesional y preguntale qué objetivo o feature técnica/negocio planea encarar hoy."
+            )
             try:
-                steps = [
-                    ("Requerimientos BDD", "DONE"),
-                    ("Contrato OpenAPI", "DONE"),
-                    ("Prism Mock :4010", "IN_PROGRESS"),
-                    ("Tests Hurl", "PENDING"),
-                    ("Implementación", "PENDING")
-                ]
-                logs_dict = {
-                    "agent": [
-                        "> Lead-Architect finalizó la entrevista.",
-                        "> Contrato y requerimientos inicializados.",
-                        "> Esperando ejecución de agentes confinados..."
-                    ],
-                    "qa": [
-                        "> Mock Server listo en http://localhost:4010",
-                        "> Pruebas Hurl a la espera de ejecución"
-                    ]
-                }
-                ui_dashboard.run_curses_dashboard(project, steps, logs_dict)
-            except Exception:
+                if agent_engine == "agy":
+                    subprocess.run(["agy", "--prompt-interactive", intro])
+                else:
+                    subprocess.run(["opencode", "run", intro])
+            except KeyboardInterrupt:
                 pass
-    else:
-        smooth_print(f"{YELLOW}Motor de agente (AGY/OpenCode) no detectado.{NC}", 0.05)
-        if shutil.which("wl-copy") and system_prompt:
-            subprocess.run(f"printf '%s' \"{system_prompt}\" | wl-copy", shell=True)
-            smooth_print(f"{GREEN}✓ Prompt del Lead-Architect copiado al portapapeles.{NC} Pegalo en tu chat de AGY o Claude.", 0.05)
+            audit_changes_rule()
         else:
-            print(f"{CYAN}Instrucciones del Lead-Architect:{NC}\n{system_prompt}")
-            print(f"{CYAN}Instrucciones del Lead-Architect:{NC}\n{system_prompt}")
+            smooth_print(f"{YELLOW}Motor de agente (AGY/OpenCode) no detectado.{NC}", 0.05)
+            if shutil.which("wl-copy") and system_prompt:
+                subprocess.run(f"printf '%s' \"{system_prompt}\" | wl-copy", shell=True)
+                smooth_print(f"{GREEN}✓ Prompt del Lead-Architect copiado al portapapeles.{NC} Pegalo en tu chat de AGY o Claude.", 0.05)
+            else:
+                print(f"{CYAN}Instrucciones del Lead-Architect:{NC}\n{system_prompt}")
 
 def get_agent_prompt(agent_name):
     """Obtiene el prompt de un agente especializado desde local o fallback empaquetado."""
