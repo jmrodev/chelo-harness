@@ -51,13 +51,121 @@ flowchart TD
 | `chelo-harness board init` | Inyecta el tablero [Daily Board](https://github.com/jmrodev/daily-board) en GitHub Pages. |
 | `chelo-harness board open` | Abre el Daily Board del repositorio en el navegador. |
 | `chelo-harness story` | Inicia entrevista con **Story-Agent (Product Owner)** para modelar BDD. |
-| `chelo-harness agent <rol>` | Lanza un agente confinado (`story`, `spec`, `qa`, `front`, `back`). |
+| `chelo-harness agent <rol>` | Lanza un agente confinado **en modo autónomo** (lee, lista y escribe en `docs/`). |
 | `chelo-harness mock` | Levanta **Prism Mock Server** en `:4010` leyendo el `openapi.yaml`. |
 | `chelo-harness proxy [url]` | Levanta **Prism Proxy** validador contra el backend real en `:8000`. |
 | `chelo-harness test` | Ejecuta la batería de pruebas Hurl (`*.hurl`) contra el contrato. |
 | `chelo-harness gate` | Ejecuta el Quality Gate (Freno de 10 cambios + Tests Hurl). |
 | `chelo-harness commit "<msg>"` | Commitea con validaciones de gobernanza (sin firmas artificiales). |
 | `chelo-harness status` | Muestra el estado del workspace bajo las reglas de Chelo. |
+
+---
+
+## 🔌 Servidor MCP (18 herramientas)
+
+`lib/chelo_mcp.py` expone el arnés completo por stdio (JSON-RPC 2.0), para que cualquier
+cliente MCP lo use como herramientas nativas.
+
+```bash
+# Registro en OpenCode (~/.config/opencode/opencode.json)
+"mcp": {
+  "chelo": {
+    "type": "local",
+    "enabled": true,
+    "command": ["python3", "/home/USUARIO/.local/lib/chelo/lib/chelo_mcp.py"]
+  }
+}
+```
+
+| Grupo | Herramientas |
+| :--- | :--- |
+| Gobernanza | `chelo_status`, `chelo_audit_changes`, `chelo_quality_gate` |
+| Contrato | `chelo_spec_read`, `chelo_contract_test` |
+| Mock | `chelo_mock_start`, `chelo_mock_status`, `chelo_mock_stop` |
+| Workspace | `chelo_stack`, `chelo_doctor`, `chelo_init`, `chelo_board_init`, `chelo_board_url` |
+| Canales ágiles | `chelo_sync`, `chelo_slack_post` |
+| Agentes | `chelo_agent_turn`, `chelo_pipeline` |
+| Git | `chelo_commit` |
+
+Todas aceptan `workspace` para operar sobre otro repo sin cambiar el cwd del servidor.
+El mock corre en segundo plano con estado en `~/.local/state/chelo-harness/`.
+`chelo_contract_test` levanta Prism por su cuenta si no está corriendo.
+
+`sync`, `story`, `agent <rol>`, `board init` y `board open` están cableados tanto en el CLI
+como en el MCP (`chelo_sync`, `chelo_agent_turn`, `chelo_pipeline`, `chelo_board_init`, `chelo_board_url`).
+
+---
+
+## 🧠 Function Calling (agentes autónomos)
+
+`lib/ai/gemini_client.py` implementa el bucle estándar de *tool use*:
+
+1. Las declaraciones viajan en `payload["tools"]` (`functionDeclarations`).
+2. Si el modelo responde con `functionCall`, el arnés ejecuta la función local.
+3. El resultado vuelve como `role: "function"` + `functionResponse`.
+4. El ciclo se repite hasta que el modelo devuelve texto (máx. 5 pasos).
+
+```bash
+chelo-harness agent story-agent      # entra en el bucle autónomo
+```
+
+```python
+run_agent_turn("story-agent", "…", use_tools=True)   # CLI y MCP
+run_agent_turn("story-agent", "…")                   # una sola pasada (default)
+```
+
+### Sandbox
+
+El agente **no** recibe el set completo de herramientas. Solo:
+
+| Tool | Alcance |
+| :--- | :--- |
+| `read_file` | archivos dentro del workspace |
+| `list_dir` | directorios dentro del workspace |
+| `write_doc` | **solo** dentro de `docs/` |
+
+`run_command` existe en `AVAILABLE_TOOLS` pero queda **fuera** del set de agentes: ejecución
+de shell disparada por un modelo no se habilita por defecto. Toda ruta se resuelve con
+`resolve()` y se verifica por contención, así que `..`, rutas absolutas y symlinks que
+apunten afuera se rechazan antes de tocar el disco.
+
+---
+
+## 🗂️ Estructura del Código
+
+Un módulo por responsabilidad. La regla: si dos cosas cambian por motivos
+distintos, van en archivos distintos.
+
+```text
+lib/
+├── chelo_mcp.py              arranque del MCP (solo imports, ~20 líneas)
+├── mcp/
+│   ├── protocol.py           JSON-RPC por stdio; no sabe qué hace cada tool
+│   ├── registry.py           catálogo: nombre, esquema y handler de cada tool
+│   ├── runtime.py            captura de stdout, cambio de workspace, estado del mock
+│   ├── schema.py             esquema de entrada común (`workspace`)
+│   └── handlers/
+│       ├── governance.py     status, audit_changes, quality_gate, commit
+│       ├── contract.py       spec_read, contract_test
+│       ├── mock.py           mock_start, mock_status, mock_stop
+│       ├── workspace.py      stack, doctor, init, board_init, board_url
+│       ├── channels.py       sync, slack_post
+│       └── agents.py         agent_turn, pipeline
+├── ai/
+│   ├── gemini_client.py      HTTP + bucle de function calling
+│   └── tools/
+│       ├── paths.py          sandbox de rutas (la única pieza que toca el disco)
+│       ├── files.py          read_file, list_dir, write_file, write_doc
+│       ├── shell.py          run_command
+│       ├── registry.py       qué tools existen y cuáles puede usar un agente
+│       └── declarations.py   esquemas JSON que se envían a Gemini
+├── core/                     gate, orquestador, runner, board, setup
+├── spec/                     mock_engine, tester
+└── ui/                       consola
+```
+
+`lib/chelo_mcp.py` se mantiene como entrada porque es el comando que registra el
+cliente MCP; el resto se puede mover sin tocar la configuración del cliente.
 
 ---
 

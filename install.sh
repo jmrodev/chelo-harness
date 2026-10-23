@@ -10,38 +10,27 @@ AGENTS_DIR="$HOME/.local/share/chelo/agents"
 
 mkdir -p "$BIN_DIR" "$LIB_DIR" "$AGENTS_DIR"
 
-BASE_URL="https://raw.githubusercontent.com/jmrodev/chelo-harness/main"
+TARBALL_URL="https://github.com/jmrodev/chelo-harness/archive/refs/heads/main.tar.gz"
 
-# Descargar ejecutable principal
-curl -fsSL "$BASE_URL/bin/chelo-harness" -o "$BIN_DIR/chelo-harness"
+# Un solo tarball en vez de una descarga por archivo: la lista hardcodeada se
+# desincronizaba con cada módulo nuevo y no soporta paquetes (lib/ai/tools/,
+# lib/mcp/handlers/). Con el árbol completo, agregar un archivo no toca el
+# instalador.
+SRC_DIR="$(mktemp -d)"
+trap 'rm -rf "$SRC_DIR"' EXIT
+
+curl -fsSL "$TARBALL_URL" | tar -xz -C "$SRC_DIR"
+SRC_ROOT="$(find "$SRC_DIR" -maxdepth 1 -mindepth 1 -type d | head -n 1)"
+if [ -z "$SRC_ROOT" ] || [ ! -d "$SRC_ROOT/lib" ]; then
+  echo "✗ No se pudo descargar el árbol del repositorio desde $TARBALL_URL" >&2
+  exit 1
+fi
+
+mkdir -p "$LIB_DIR/lib" "$AGENTS_DIR"
+cp -R "$SRC_ROOT/lib/." "$LIB_DIR/lib/"
+cp "$SRC_ROOT/bin/chelo-harness" "$BIN_DIR/chelo-harness"
 chmod +x "$BIN_DIR/chelo-harness"
-
-# Descargar módulos de la librería chelo
-for mod in chelo_channels.py ui_dashboard.py chelo_mcp.py; do
-  curl -fsSL "$BASE_URL/lib/$mod" -o "$LIB_DIR/$mod" 2>/dev/null || true
-done
-
-# Descargar paquetes modulares (core, spec, ai, ui)
-mkdir -p "$LIB_DIR/core" "$LIB_DIR/spec" "$LIB_DIR/ai" "$LIB_DIR/ui"
-touch "$LIB_DIR/__init__.py" "$LIB_DIR/core/__init__.py" "$LIB_DIR/spec/__init__.py" "$LIB_DIR/ai/__init__.py" "$LIB_DIR/ui/__init__.py"
-
-for f in gate.py init_project.py orchestrator.py runner.py setup.py; do
-  curl -fsSL "$BASE_URL/lib/core/$f" -o "$LIB_DIR/core/$f" 2>/dev/null || true
-done
-for f in mock_engine.py tester.py; do
-  curl -fsSL "$BASE_URL/lib/spec/$f" -o "$LIB_DIR/spec/$f" 2>/dev/null || true
-done
-for f in gemini_client.py tools.py; do
-  curl -fsSL "$BASE_URL/lib/ai/$f" -o "$LIB_DIR/ai/$f" 2>/dev/null || true
-done
-for f in console.py; do
-  curl -fsSL "$BASE_URL/lib/ui/$f" -o "$LIB_DIR/ui/$f" 2>/dev/null || true
-done
-
-# Descargar roles de agentes confinados
-for agent in lead-architect story-agent spec-architect qa-tester frontend-dev backend-dev git-agent; do
-  curl -fsSL "$BASE_URL/agents/${agent}.md" -o "$AGENTS_DIR/${agent}.md" 2>/dev/null || true
-done
+cp -R "$SRC_ROOT/agents/." "$AGENTS_DIR/" 2>/dev/null || true
 
 echo "✓ Chelo-Harness instalado en $BIN_DIR/chelo-harness"
 echo ""
