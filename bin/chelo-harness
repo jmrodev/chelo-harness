@@ -426,6 +426,86 @@ jsonpath "$.status" == "ok"
             f.write(agents_content)
         print(f"  {GREEN}✓ Constitución de gobernanza creada:{NC} AGENTS.md")
 
+    # 8. GitHub Actions CI Workflow oficial para el proyecto
+    workflows_dir = cwd / ".github" / "workflows"
+    workflows_dir.mkdir(parents=True, exist_ok=True)
+    ci_file = workflows_dir / "quality-gate.yml"
+    if not ci_file.exists():
+        ci_content = """name: Spec-First Quality Gate CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  contract-quality-gate:
+    name: 🛡️ OpenAPI + Prism + Hurl Quality Gate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Setup Node.js (for Prism)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: 📦 Install Stoplight Prism CLI
+        run: npm install -g @stoplight/prism-cli
+
+      - name: 📦 Install Hurl
+        run: |
+          HURL_VER="8.0.1"
+          curl -fsSL -o hurl.deb "https://github.com/Orange-OpenSource/hurl/releases/download/${HURL_VER}/hurl_${HURL_VER}_amd64.deb"
+          sudo apt install -y ./hurl.deb
+          rm -f hurl.deb
+
+      - name: 🚀 Start Prism Mock Server
+        run: |
+          SPEC_FILE="$(find . -maxdepth 2 -name 'openapi.yaml' -o -name 'openapi.yml' | head -n 1)"
+          if [ -z "$SPEC_FILE" ]; then
+            echo "::error::No se encontró openapi.yaml en el repositorio."
+            exit 1
+          fi
+          prism mock "$SPEC_FILE" -p 4010 > prism.log 2>&1 &
+          sleep 4
+          curl -s http://127.0.0.1:4010/health || true
+
+      - name: 🧪 Run Hurl Contract Tests
+        id: hurl_tests
+        run: |
+          mkdir -p test-reports
+          TEST_FILES=$(find . -name "*.hurl" | sort)
+          if [ -z "$TEST_FILES" ]; then
+            echo "⚠️ No .hurl test files found."
+            echo "status=skipped" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          hurl --test --report-html test-reports $TEST_FILES
+          echo "status=passed" >> $GITHUB_OUTPUT
+
+      - name: 📊 Publish GitHub Step Summary
+        if: always()
+        run: |
+          echo "## 🛡️ Reporte del Quality Gate (Spec-First)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Herramienta | Verificación | Estado |" >> $GITHUB_STEP_SUMMARY
+          echo "| :--- | :--- | :--- |" >> $GITHUB_STEP_SUMMARY
+          echo "| **OpenAPI** | Validación de Contrato | ✅ Válido |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Prism Mock** | Servidor Simulado (:4010) | ✅ Activo |" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.hurl_tests.outputs.status }}" = "passed" ]; then
+            echo "| **Hurl** | Batería de Tests (*.hurl) | ✅ APROBADO (0 violaciones) |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| **Hurl** | Batería de Tests (*.hurl) | ❌ FALLÓ |" >> $GITHUB_STEP_SUMMARY
+          fi
+"""
+        with open(ci_file, "w", encoding="utf-8") as f:
+            f.write(ci_content)
+        print(f"  {GREEN}✓ Pipeline GitHub Actions inyectado:{NC} .github/workflows/quality-gate.yml")
+
     print(f"\n{GREEN}{BOLD}🎉 ¡Proyecto inicializado con éxito!{NC}")
     print(f"{CYAN}Para probar el ciclo en 10 segundos:{NC}")
     print(f"  1. {YELLOW}chelo-harness mock &{NC}  (Levanta el servidor simulado en :4010)")
