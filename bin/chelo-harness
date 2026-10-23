@@ -401,12 +401,6 @@ jsonpath "$.status" == "ok"
         with open(readme_docs, "w", encoding="utf-8") as f:
             f.write(f"# Arquitectura del Proyecto {cwd.name}\n\nDocumentación viva de contratos y diagramas Mermaid.\n")
 
-    # 7. Reglas para GGA / Coding Agents
-    agents_rules = cwd / "AGENTS.md"
-    if not agents_rules.exists():
-        with open(agents_rules, "w", encoding="utf-8") as f:
-            f.write("# Reglas de Gobernanza del Proyecto\n- Spec-First estricto: Todo cambio de endpoint requiere actualizar openapi.yaml primero.\n- Máximo 10 archivos modificados por ticket.\n- Tests Hurl obligatorios.\n")
-
     print(f"\n{GREEN}{BOLD}🎉 ¡Proyecto inicializado con éxito!{NC}")
     print(f"{CYAN}Para probar el ciclo en 10 segundos:{NC}")
     print(f"  1. {YELLOW}chelo-harness mock &{NC}  (Levanta el servidor simulado en :4010)")
@@ -952,15 +946,8 @@ def cmd_gate():
     if not audit_changes_rule():
         sys.exit(2)
 
-    cmd_test()
-
-    if shutil.which("gga"):
-        print(f"\n{BLUE}▶ Ejecutando auditoría de riesgos con GGA...{NC}")
-        gga_res = subprocess.run(["gga", "run"], capture_output=True, text=True)
-        if gga_res.returncode == 0:
-            print(f"{GREEN}✓ Auditoría GGA aprobada sin riesgos críticos.{NC}")
-        else:
-            print(f"{YELLOW}⚠️  Aviso GGA:{NC}\n{gga_res.stdout[:300]}")
+    if not cmd_test():
+        sys.exit(1)
 
     print(f"\n{GREEN}{BOLD}✓ QUALITY GATE SUPERADO EXITOSAMENTE.{NC}")
 
@@ -1004,7 +991,7 @@ def print_help():
     print("  chelo-harness mock              Levanta Prism Mock Server (:4010) leyendo el openapi.yaml")
     print("  chelo-harness proxy [url]       Levanta Prism Proxy validador contra backend real (:8000)")
     print("  chelo-harness test              Ejecuta la suite de pruebas Hurl (*.hurl) contra el contrato")
-    print("  chelo-harness gate              Ejecuta Quality Gate completo (10 cambios, Hurl, GGA)")
+    print("  chelo-harness gate              Ejecuta Quality Gate completo (Freno de 10 cambios + Tests Hurl)")
     print("  chelo-harness commit \"<msg>\"    Commitea con validaciones de gobernanza pre-commit")
     print("  chelo-harness status            Inspecciona el estado del workspace bajo las reglas de Chelo")
 

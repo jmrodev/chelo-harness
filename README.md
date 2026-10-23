@@ -53,7 +53,7 @@ flowchart TD
 | `chelo-harness mock` | Levanta **Prism Mock Server** en `:4010` leyendo el `openapi.yaml`. |
 | `chelo-harness proxy [url]` | Levanta **Prism Proxy** validador contra el backend real en `:8000`. |
 | `chelo-harness test` | Ejecuta la batería de pruebas Hurl (`*.hurl`) contra el contrato. |
-| `chelo-harness gate` | Ejecuta el Quality Gate (Freno de 10 cambios, Hurl, GGA). |
+| `chelo-harness gate` | Ejecuta el Quality Gate (Freno de 10 cambios + Tests Hurl). |
 | `chelo-harness commit "<msg>"` | Commitea con validaciones de gobernanza (sin firmas artificiales). |
 | `chelo-harness status` | Muestra el estado del workspace bajo las reglas de Chelo. |
 
