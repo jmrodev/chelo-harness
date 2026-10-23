@@ -49,7 +49,7 @@ def cmd_commit(message):
     if res.returncode == 0:
         print(f"{GREEN}✓ Commit exitoso.{NC}")
 
-def cmd_interactive():
+def cmd_interactive(trace: bool = False):
     banner()
     check_git_repo()
     project = get_project_name()
@@ -60,14 +60,15 @@ def cmd_interactive():
         smooth_print(f"{YELLOW}Sesión finalizada.{NC}")
         return
         
-    run_pipeline(project, prompt)
+    run_pipeline(project, prompt, trace=trace)
 
 def print_help():
     banner()
     print(f"{BOLD}USO:{NC}")
-    print("  chelo-harness [comando] [argumentos...]\n")
+    print("  chelo-harness [comando] [flags...]\n")
     print(f"{BOLD}COMANDOS PRINCIPALES:{NC}")
     print("  chelo-harness                   Inicia la orquestación interactiva Spec-First")
+    print("  chelo-harness --trace / --test  Modo auditoría en vivo (muestra agentes, llamadas y respuestas)")
     print("  chelo-harness init              Inicializa openapi.yaml, AGENTS.md y tests base")
     print("  chelo-harness setup             Configura API keys y entorno")
     print("  chelo-harness doctor            Diagnostica herramientas instaladas")
@@ -79,13 +80,16 @@ def print_help():
     print("  chelo-harness status            Verifica el disyuntor de archivos")
 
 def main():
-    if len(sys.argv) == 1:
-        cmd_interactive()
+    trace_mode = "--trace" in sys.argv or "--test" in sys.argv or "-v" in sys.argv
+    cleaned_args = [a for a in sys.argv if a not in ["--trace", "--test", "-v"]]
+
+    if len(cleaned_args) == 1:
+        cmd_interactive(trace=trace_mode)
         sys.exit(0)
 
-    cmd = sys.argv[1]
+    cmd = cleaned_args[1]
     if cmd in ["ask", "start", "run"]:
-        cmd_interactive()
+        cmd_interactive(trace=trace_mode)
     elif cmd == "init":
         cmd_init()
     elif cmd in ["setup", "config", "keys"]:

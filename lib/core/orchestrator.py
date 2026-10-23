@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
 Módulo orquestador de agentes de Chelo-Harness.
-Ejecuta la cadena Spec-First: Lead-Architect -> Story-Agent -> Spec-Architect -> QA-Tester -> Devs
-utilizando Function Calling y verificación determinista.
+Ejecuta la cadena Spec-First con soporte para modo verbose/auditoría (--test-trace).
 """
 
 import os
@@ -28,27 +27,45 @@ def strip_markdown_blocks(text: str) -> str:
         cleaned = re.sub(r"\n```$", "", cleaned)
     return cleaned.strip()
 
-def run_agent_turn(agent_role: str, user_instruction: str, context: str = ""):
-    """Invoca a un agente específico con su rol y directivas aisladas."""
+def log_trace(msg: str, trace_enabled: bool = False):
+    if trace_enabled:
+        print(f"  {MAGENTA}[TRACE/AUDITORÍA]{NC} {msg}")
+
+def run_agent_turn(agent_role: str, user_instruction: str, context: str = "", trace: bool = False):
+    """Invoca a un agente específico mostrando traza en tiempo real si trace=True."""
     system_prompt = get_agent_prompt(agent_role)
+    log_trace(f"Cargando agente: '{agent_role}' (Directivas: {len(system_prompt)} bytes)", trace)
+    
     full_prompt = (
         f"Directivas del rol:\n{system_prompt}\n\n"
         f"Contexto del workspace:\n{context}\n\n"
         f"Tarea requerida:\n{user_instruction}\n\n"
         f"IMPORTANTE: Devolvé ÚNICAMENTE el contenido del artefacto final sin prefacios ni explicaciones conversacionales."
     )
-    return gemini_client.generate_content(full_prompt, system_instruction=system_prompt)
+    
+    t0 = time.time()
+    resp = gemini_client.generate_content(full_prompt, system_instruction=system_prompt)
+    elapsed = time.time() - t0
+    
+    model_used = resp.get("model_used", "desconocido")
+    chars_received = len(resp.get("text", "")) if resp.get("ok") else 0
+    log_trace(f"Respuesta de Gemini recibida en {elapsed:.2f}s | Modelo: {model_used} | Tamaño: {chars_received} chars", trace)
+    
+    return resp
 
-def run_pipeline(project_name: str, requirement: str):
-    """Ejecuta el pipeline desacoplado paso a paso con agentes independientes y verificación estricta."""
-    smooth_print(f"\n{BOLD}{BLUE}⚙️  CHELO-HARNESS: Iniciando Pipeline Desacoplado (Spec-First)...{NC}\n", 0.05)
+def run_pipeline(project_name: str, requirement: str, trace: bool = False):
+    """Ejecuta el pipeline desacoplado mostrando con certeza cada función y llamada."""
+    smooth_print(f"\n{BOLD}{BLUE}⚙️  CHELO-HARNESS: Iniciando Pipeline Spec-First...{NC}", 0.05)
+    if trace:
+        smooth_print(f"{MAGENTA}{BOLD}🔍 MODO AUDITORÍA / TEST-TRACE ACTIVO{NC}: Inspección en vivo de llamadas y agentes sin simulación.\n", 0.05)
 
     # 1. STORY-AGENT: BDD Gherkin
-    smooth_print(f"  {CYAN}▶ [1/3] Disparando Story-Agent (BDD)...{NC}")
+    smooth_print(f"  {CYAN}▶ [1/3] Invocando Story-Agent (BDD)...{NC}")
     story_resp = run_agent_turn(
         "story-agent",
         f"Generá la User Story BDD en Markdown para: {requirement}. "
-        f"Estructura obligatoria: Rol, Acción, Beneficio, Escenarios Gherkin (Given/When/Then) y Lista Blanca de Endpoints requeridos."
+        f"Estructura obligatoria: Rol, Acción, Beneficio, Escenarios Gherkin (Given/When/Then) y Lista Blanca de Endpoints requeridos.",
+        trace=trace
     )
     if not story_resp.get("ok"):
         smooth_print(f"  {RED}❌ Error en Story-Agent: {story_resp.get('error')}{NC}")
@@ -58,15 +75,17 @@ def run_pipeline(project_name: str, requirement: str):
     story_path = Path.cwd() / "docs/stories/US-001.md"
     story_path.parent.mkdir(parents=True, exist_ok=True)
     story_path.write_text(story_content, encoding="utf-8")
-    smooth_print(f"  {GREEN}✓ [Story-Agent]{NC} User Story generada en {CYAN}{story_path.relative_to(Path.cwd())}{NC}")
+    log_trace(f"Escrito en disco: {story_path} ({len(story_content)} bytes)", trace)
+    smooth_print(f"  {GREEN}✓ [Story-Agent]{NC} User Story escrita en {CYAN}{story_path.relative_to(Path.cwd())}{NC}")
 
     # 2. SPEC-ARCHITECT: OpenAPI 3.0 Contract
-    smooth_print(f"  {CYAN}▶ [2/3] Disparando Spec-Architect (OpenAPI 3.0)...{NC}")
+    smooth_print(f"  {CYAN}▶ [2/3] Invocando Spec-Architect (OpenAPI 3.0)...{NC}")
     spec_resp = run_agent_turn(
         "spec-architect",
         "Diseñá la especificación openapi.yaml completa en YAML estricto cumpliendo la User Story. "
         "No uses bloque servers para evitar descalces. Incluí /health y schemas con examples para cada respuesta.",
-        context=story_content
+        context=story_content,
+        trace=trace
     )
     if not spec_resp.get("ok"):
         smooth_print(f"  {RED}❌ Error en Spec-Architect: {spec_resp.get('error')}{NC}")
@@ -75,15 +94,17 @@ def run_pipeline(project_name: str, requirement: str):
     spec_content = strip_markdown_blocks(spec_resp.get("text", ""))
     spec_path = Path.cwd() / "openapi.yaml"
     spec_path.write_text(spec_content, encoding="utf-8")
-    smooth_print(f"  {GREEN}✓ [Spec-Architect]{NC} Contrato generado en {CYAN}openapi.yaml{NC}")
+    log_trace(f"Escrito en disco: {spec_path} ({len(spec_content)} bytes)", trace)
+    smooth_print(f"  {GREEN}✓ [Spec-Architect]{NC} Contrato escrito en {CYAN}openapi.yaml{NC}")
 
     # 3. QA-TESTER: Tests Hurl con aserción de contrato
-    smooth_print(f"  {CYAN}▶ [3/3] Disparando QA-Tester (Tests Hurl)...{NC}")
+    smooth_print(f"  {CYAN}▶ [3/3] Invocando QA-Tester (Tests Hurl)...{NC}")
     qa_resp = run_agent_turn(
         "qa-tester",
         "Escribí los tests de contrato Hurl contra http://localhost:4010 para cada endpoint del contrato OpenAPI. "
         "Obligatorio: incluir aserción `header \"sl-violations\" not exists` y asserts de status code.",
-        context=spec_content
+        context=spec_content,
+        trace=trace
     )
     if not qa_resp.get("ok"):
         smooth_print(f"  {RED}❌ Error en QA-Tester: {qa_resp.get('error')}{NC}")
@@ -93,25 +114,29 @@ def run_pipeline(project_name: str, requirement: str):
     hurl_path = Path.cwd() / "tests/001_contract.hurl"
     hurl_path.parent.mkdir(parents=True, exist_ok=True)
     hurl_path.write_text(qa_content, encoding="utf-8")
-    smooth_print(f"  {GREEN}✓ [QA-Tester]{NC} Suite generada en {CYAN}{hurl_path.relative_to(Path.cwd())}{NC}\n")
+    log_trace(f"Escrito en disco: {hurl_path} ({len(qa_content)} bytes)", trace)
+    smooth_print(f"  {GREEN}✓ [QA-Tester]{NC} Suite escrita en {CYAN}{hurl_path.relative_to(Path.cwd())}{NC}\n")
 
     # 4. Verificación de Contrato
-    smooth_print(f"{BOLD}{BLUE}🔍 Ejecutando verificación de contrato OpenAPI + Prism...{NC}\n", 0.05)
+    smooth_print(f"{BOLD}{BLUE}🔍 Ejecutando verificación real de contrato (Hurl + Prism)...{NC}", 0.05)
+    log_trace("Llamando a execute_tests_and_collect_errors() en lib/spec/tester.py", trace)
     passed, errors = execute_tests_and_collect_errors()
 
-    # Bucle de auto-corrección determinista (Spec-Architect y QA) si hubo fallas
     if not passed:
-        smooth_print(f"\n{YELLOW}🔄 Disparando reconciliación de contrato Spec-First...{NC}\n", 0.05)
+        smooth_print(f"\n{YELLOW}🔄 Disparando reconciliación de contrato con Spec-Architect...{NC}\n", 0.05)
         err_report = "\n".join(errors)
+        log_trace(f"Error report entregado al Spec-Architect:\n{err_report}", trace)
         fix_resp = run_agent_turn(
             "spec-architect",
             f"El test de contrato falló contra Prism con este error:\n{err_report}\n\n"
             f"Corregí el openapi.yaml para satisfacer las respuestas y schemas requeridos.",
-            context=f"Historia:\n{story_content}\n\nOpenAPI actual:\n{spec_content}"
+            context=f"Historia:\n{story_content}\n\nOpenAPI actual:\n{spec_content}",
+            trace=trace
         )
         if fix_resp.get("ok"):
             fixed_spec = strip_markdown_blocks(fix_resp.get("text", ""))
             spec_path.write_text(fixed_spec, encoding="utf-8")
+            log_trace(f"Contrato reescrito en disco ({len(fixed_spec)} bytes)", trace)
             smooth_print(f"  {CYAN}✓ [Spec-Architect]{NC} Contrato reconciliado. Re-probando...")
             passed, _ = execute_tests_and_collect_errors()
 
