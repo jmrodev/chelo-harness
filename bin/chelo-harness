@@ -20,6 +20,10 @@ if LIB_PATH not in sys.path:
     sys.path.insert(0, LIB_PATH)
 
 import chelo_channels
+try:
+    import ui_dashboard
+except ImportError:
+    ui_dashboard = None
 
 def load_persisted_env():
     """Carga automáticamente las claves guardadas en ~/.profile, ~/.bashrc, ~/.zshrc o .env aunque la terminal no haya hecho source."""
@@ -859,6 +863,27 @@ def cmd_test():
     passed, _ = execute_tests_and_collect_errors()
     return passed
 
+def select_view_mode():
+    """Permite al desarrollador elegir de forma agnóstica cómo visualizar a los agentes."""
+    if "--zen" in sys.argv or "-q" in sys.argv:
+        return "zen"
+    if "--verbose" in sys.argv or "-v" in sys.argv:
+        return "verbose"
+    if "--dashboard" in sys.argv or "-d" in sys.argv:
+        return "dashboard"
+
+    print(f"{BOLD}{CYAN}¿Cómo querés visualizar la ejecución de los agentes en esta sesión?{NC}")
+    print(f"  [1] 🧘 {BOLD}Modo Zen (Silencioso){NC}: Barra de progreso limpia sin saturar la terminal.")
+    print(f"  [2] 📜 {BOLD}Modo Verbose (Streaming){NC}: Visualización en vivo de cada línea que escribe el agente.")
+    print(f"  [3] 🎛️  {BOLD}Modo Dashboard TUI{NC}: Multi-panel dividido en cajas ANSI/Curses agnósticas.")
+    
+    choice = input(f"\n{BOLD}Seleccioná [1-3] (Default: 1): {NC}").strip()
+    if choice == "2":
+        return "verbose"
+    elif choice == "3":
+        return "dashboard"
+    return "zen"
+
 def cmd_interactive_session():
     banner()
     check_git_repo()
@@ -866,6 +891,9 @@ def cmd_interactive_session():
 
     print(f"📂 Proyecto detectado: {BOLD}{GREEN}{project}{NC}\n")
     cmd_daily_sync()
+
+    view_mode = select_view_mode()
+    print(f"   {GREEN}✓ Modo visual activo:{NC} {view_mode.upper()}\n")
 
     print(f"{MAGENTA}{BOLD}🧙 ORQUESTACIÓN VIVA: LEAD-ARCHITECT (CHELO-HARNESS){NC}")
     print(f"{CYAN}El Lead-Architect analizará el workspace contigo para definir gobernanza (AGENTS.md),{NC}")
