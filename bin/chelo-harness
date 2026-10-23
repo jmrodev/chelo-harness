@@ -781,187 +781,31 @@ def cmd_interactive_session():
     project = get_project_name()
 
     print(f"📂 Proyecto detectado: {BOLD}{GREEN}{project}{NC}\n")
-
     cmd_daily_sync()
 
-    # FASE 0: INVESTIGACIÓN Y REQUERIMIENTOS
-    print(f"{MAGENTA}{BOLD}📋 FASE 0: INVESTIGACIÓN & LEVANTAMIENTO DE REQUERIMIENTOS{NC}")
-    print(f"{YELLOW}Antes del código y la arquitectura técnica, definimos el problema de negocio.{NC}\n")
+    print(f"{MAGENTA}{BOLD}🧙 ORQUESTACIÓN VIVA: LEAD-ARCHITECT (CHELO-HARNESS){NC}")
+    print(f"{CYAN}El Lead-Architect analizará el workspace contigo para definir gobernanza (AGENTS.md),{NC}")
+    print(f"{CYAN}revisar contratos y configurar agentes ad-hoc si la tarea lo amerita.{NC}\n")
 
-    selected_issue_number = None
-    if shutil.which("gh"):
-        try:
-            sprint_info = chelo_channels.get_github_sprint_context()
-            open_issues = sprint_info.get("issues", [])
-            if open_issues:
-                issue_opts = [f"#{i['number']} {i['title']}" for i in open_issues[:5]]
-                usar_gh = select_option("¿Querés asociar esta sesión a un Issue abierto de GitHub?", ["Escribir requerimiento manual"] + issue_opts, allow_custom=False)
-                if usar_gh != "Escribir requerimiento manual":
-                    selected_issue_number = usar_gh.split()[0].replace("#", "")
-                    subprocess.run(["gh", "issue", "edit", selected_issue_number, "--add-label", "status:in-progress", "--remove-label", "status:todo"], capture_output=True)
-                    print(f"   {GREEN}✓ Issue #{selected_issue_number} vinculado y marcado `status:in-progress` en GitHub.{NC}\n")
-        except Exception:
-            pass
+    system_prompt = get_agent_prompt("lead-architect")
+    runner_opencode = find_opencode_runner()
 
-    req_problema = prompt_text("1. ¿Qué problema o ineficiencia del proceso actual se quiere resolver?", "Gestión manual lenta y propensa a errores")
-    print(f"   {GREEN}✓ Problema:{NC} {req_problema}\n")
-
-    req_actores = prompt_text("2. ¿Quiénes son los actores que interactúan con el sistema? (ej: Administrador, Cliente, API)", "Administrador, Sistema API")
-    print(f"   {GREEN}✓ Actores:{NC} {req_actores}\n")
-
-    req_alcance = prompt_text("3. ¿Cuál es el alcance funcional concreto (Qué debe hacer y qué NO debe hacer)?", "CRUD de la entidad principal sin dependencias complejas")
-    print(f"   {GREEN}✓ Alcance:{NC} {req_alcance}\n")
-
-    req_criterio = prompt_text("4. ¿Cuál es el criterio de aceptación / escenario BDD clave? (Given / When / Then)", "Dado un payload válido, cuando se envíe un POST, responde 201 y el recurso creado")
-    print(f"   {GREEN}✓ Criterio de Aceptación:{NC} {req_criterio}\n")
-
-    # FASE 1: ENCUADRE TÉCNICO
-    print(f"{BLUE}{BOLD}🧠 FASE 1: ENCUADRE DE ARQUITECTURA & GOBERNANZA TÉCNICA{NC}\n")
-
-    tipos_tarea = [
-        "Nueva Feature / Requerimiento (OpenAPI Spec -> Hurl Test -> Mock -> Code)",
-        "Refactorización / Clean Code (Preservar contrato OpenAPI intacto)",
-        "Bugfix / Corrección (Reproducir primero con test .hurl fallido)",
-        "Infraestructura / Docker / Despliegue (Dockerfile, compose, networking)",
-        "Testing / Cobertura de Contrato (Batería Hurl y asserts sl-violations)"
-    ]
-    p_tipo = select_option("¿Qué tipo de trabajo técnico estás encarando?", tipos_tarea)
-    print(f"   {GREEN}✓ Seleccionado:{NC} {p_tipo}\n")
-
-    patrones_arq = [
-        "Spec-First / Contract-Driven (OpenAPI + Prism Mock + Hurl Tests sin BBDD inicial)",
-        "Hexagonal / Ports & Adapters (Dominio desacoplado de infraestructura)",
-        "Clean Architecture / Onion (Casos de uso y entidades puras)",
-        "Container / Presentational (UI tonta desacoplada de API)",
-        "Unix-First / CLI Pipeline (Herramientas nativas ligeras sin dependencias infladas)"
-    ]
-    p_arquitectura = select_option("¿Bajo qué patrón de arquitectura se debe desarrollar?", patrones_arq)
-    print(f"   {GREEN}✓ Seleccionado:{NC} {p_arquitectura}\n")
-
-    disciplinas_spec = [
-        "Ciclo Completo: Documentación (Actores/Alcance/Gherkin) + OpenAPI + Prism Mock (:4010) + Hurl Tests",
-        "API-First Estricto: Contrato OpenAPI (.yaml) + Prism Mock + Tests Hurl sin violaciones ('sl-violations')",
-        "TDD Backend: Endpoint en PHP/Node validado vía Prism Proxy antes de persistir",
-        "Docs-as-Code: Diagramas Mermaid (.mmd) integrados en Markdown"
-    ]
-    p_spec = select_option("¿Qué protocolo de verificación debe anteponerse al código?", disciplinas_spec)
-    print(f"   {GREEN}✓ Seleccionado:{NC} {p_spec}\n")
-
-    lenguajes = [
-        "PHP nativo modular / SQLite (Router declarativo, PDO, cero frameworks inflados)",
-        "TypeScript / Node.js (Prism, Fastify, Express o React nativo)",
-        "Python (FastAPI / Typer)",
-        "Bash / Shell Scripting (Unix tools, curl, hurl, jq)"
-    ]
-    p_lenguaje = select_option("¿Cuál es el stack / runtime base?", lenguajes)
-    print(f"   {GREEN}✓ Seleccionado:{NC} {p_lenguaje}\n")
-
-    restricciones = [
-        "REGLA DE CONTRATO: El test Hurl debe validar que no exista el header 'sl-violations'",
-        "REGLA DE TDD: Ningún endpoint en backend sin su test .hurl correspondiente",
-        "REGLA DE SIMPLICIDAD: Cero bases de datos pesadas en fase de diseño; resolver primero con mock/sqlite",
-        "REGLA DE CONTENEDOR: El proyecto debe levantarse de forma reproducible sin paquetes globales",
-        "REGLA DE CONFINAMIENTO: Modificar únicamente los archivos asociados al ticket (máx 10)"
-    ]
-    p_restriccion = select_option("¿Cuál es la restricción crítica que el agente NO puede violar?", restricciones)
-    print(f"   {GREEN}✓ Seleccionado:{NC} {p_restriccion}\n")
-
-    # SELECCIÓN INTELIGENTE DE AGENTE
-    has_opencode = bool(shutil.which("opencode"))
-    has_agy = bool(shutil.which("agy"))
-
-    agentes = []
-    if has_opencode:
-        agentes.append("OpenCode CLI (Ejecución directa en segundo plano / terminal)")
-        agentes.append("OpenCode TUI (Sesión interactiva en multiplexer Herdr)")
-    else:
-        agentes.append("Instalar OpenCode ahora (curl -fsSL https://opencode.ai/install | bash)")
-
-    if has_agy:
-        agentes.append("Antigravity CLI (Copiar prompt blindado al portapapeles para AGY)")
-    else:
-        agentes.append("Copiar prompt al portapapeles (Para usar con Claude / Cursor / ChatGPT)")
-
-    agentes.append("Solo registrar contexto en Engram (no disparar agente ahora)")
-
-    p_agente = select_option("¿Qué agente ejecutará este trabajo?", agentes, allow_custom=False)
-    print(f"   {GREEN}✓ Seleccionado:{NC} {p_agente}\n")
-
-    # Persistir en Engram
-    topic = f"harness/{project}/{p_tipo.split('/')[0].strip().lower().replace(' ', '-')}"
-    doc_content = (
-        f"# Levantamiento de Requerimientos y Encuadre — {project}\n\n"
-        f"## 1. Análisis de Negocio (Fase 0)\n"
-        f"- **Problema**: {req_problema}\n"
-        f"- **Actores**: {req_actores}\n"
-        f"- **Alcance**: {req_alcance}\n"
-        f"- **Criterio de Aceptación (BDD)**: {req_criterio}\n"
-        f"- **GitHub Issue**: {f'#{selected_issue_number}' if selected_issue_number else 'N/A'}\n\n"
-        f"## 2. Encuadre Técnico (Fase 1)\n"
-        f"- **Tipo de Tarea**: {p_tipo}\n"
-        f"- **Patrón Arquitectónico**: {p_arquitectura}\n"
-        f"- **Protocolo Contract-First**: {p_spec}\n"
-        f"- **Stack**: {p_lenguaje}\n"
-        f"- **Restricción Crítica**: {p_restriccion}\n"
-    )
-
-    try:
-        if shutil.which("engram"):
-            p = subprocess.Popen(["engram", "set", topic], stdin=subprocess.PIPE, text=True)
-            p.communicate(input=doc_content)
-            print(f"{GREEN}✓ Memoria persistida en Engram:{NC} `{topic}`\n")
-    except Exception:
-        pass
-
-    prompt_confinado = (
-        f"ANÁLISIS DE NEGOCIO (REQUERIMIENTOS):\n"
-        f"  • PROBLEMA: {req_problema}\n"
-        f"  • ACTORES: {req_actores}\n"
-        f"  • ALCANCE: {req_alcance}\n"
-        f"  • BDD / CRITERIO: {req_criterio}\n"
-        f"{f'  • TICKET GITHUB: Closes #{selected_issue_number}' if selected_issue_number else ''}\n\n"
-        f"ARQUITECTURA: {p_arquitectura}\n"
-        f"STACK: {p_lenguaje}\n\n"
-        f"PROTOCOLO STRICT SPEC-FIRST:\n"
-        f"  1. DOCUMENTACIÓN & MODELADO: Definir casos de negocio en markdown y diagramas Mermaid (.mmd).\n"
-        f"  2. CONTRATO SAGRADO: Escribir/actualizar openapi.yaml con schemas, rutas y examples.\n"
-        f"  3. PRISM MOCK: El endpoint debe responder en http://localhost:4010 simulado por Prism sin BBDD.\n"
-        f"  4. TEST HURL: Escribir test (.hurl) con assert `header 'sl-violations' not exists`.\n"
-        f"  5. BACKEND TARDÍO: Implementar la ruta mínima en PHP/Node y SQLite solo cuando el mock pase.\n\n"
-        f"REGLA CRÍTICA: {p_restriccion}\n"
-        f"LÍMITE ESTRICTO: No modificar más de 10 archivos bajo ninguna circunstancia."
-    )
-
-    if "Instalar OpenCode" in p_agente:
-        print(f"\n{BLUE}🚀 Instalando OpenCode CLI oficial...{NC}")
-        subprocess.run("curl -fsSL https://opencode.ai/install | bash", shell=True)
-        print(f"{GREEN}✓ OpenCode instalado.{NC} Volvé a correr chelo-harness para ejecutarlo.")
-
-    elif "OpenCode CLI" in p_agente:
-        print(f"\n{BLUE}🚀 Disparando OpenCode con el prompt gobernado...{NC}\n")
-        subprocess.run(["opencode", "run", prompt_confinado])
+    if runner_opencode:
+        print(f"{GREEN}Iniciando sesión viva con el Lead-Architect (OpenCode)...{NC}\n")
+        intro = (
+            f"{system_prompt}\n\n"
+            f"El desarrollador acaba de iniciar una sesión de trabajo en el proyecto '{project}'.\n"
+            f"Saludalo con tono profesional y preguntale qué objetivo o feature técnica/negocio planea encarar hoy."
+        )
+        subprocess.run([runner_opencode, "run", intro])
         audit_changes_rule()
-
-    elif "OpenCode TUI" in p_agente:
-        print(f"\n{BLUE}🚀 Abriendo OpenCode TUI en el workspace...{NC}")
-        if shutil.which("wl-copy"):
-            subprocess.run(f"printf '%s' \"{prompt_confinado}\" | wl-copy", shell=True)
-            print(f"{GREEN}✓ Prompt gobernado copiado al portapapeles.{NC} Pegalo con Ctrl+V.")
-        subprocess.run(["opencode"])
-        audit_changes_rule()
-
-    elif "portapapeles" in p_agente.lower() or "antigravity" in p_agente.lower():
-        if shutil.which("wl-copy"):
-            subprocess.run(f"printf '%s' \"{prompt_confinado}\" | wl-copy", shell=True)
-            print(f"\n{GREEN}{BOLD}✓ Prompt gobernado generado y copiado al portapapeles.{NC}")
+    else:
+        print(f"{YELLOW}OpenCode no está presente para abrir el diálogo directo en terminal.{NC}")
+        if shutil.which("wl-copy") and system_prompt:
+            subprocess.run(f"printf '%s' \"{system_prompt}\" | wl-copy", shell=True)
+            print(f"{GREEN}✓ Prompt del Lead-Architect copiado al portapapeles.{NC} Pegalo en tu chat de AGY o Claude.")
         else:
-            print(f"\n{GREEN}{BOLD}✓ Prompt gobernado generado:{NC}")
-
-        print(f"{CYAN}Pegalo en tu chat con Antigravity, Claude, ChatGPT o Cursor.{NC}\n")
-        print(f"{BOLD}Contenido del marco:{NC}")
-        print(f"--------------------------------------------------")
-        print(prompt_confinado)
-        print(f"--------------------------------------------------")
+            print(f"{CYAN}Instrucciones del Lead-Architect:{NC}\n{system_prompt}")
 
 def get_agent_prompt(agent_name):
     """Obtiene el prompt de un agente especializado desde local o fallback empaquetado."""
