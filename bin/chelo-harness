@@ -1113,10 +1113,47 @@ def cmd_interactive_session():
 
                             print("")
                             smooth_print(f"{BOLD}{GREEN}🎉 Ciclo Spec-First generado con éxito. Verificando contrato con Prism Mock y Hurl...{NC}\n", 0.05)
-                            test_result = subprocess.run([sys.argv[0], "test"], capture_output=True, text=True)
-                            print(test_result.stdout)
-                            if test_result.stderr:
-                                print(test_result.stderr)
+                            
+                            # BUCLE DE AUTO-REPARACIÓN (SELF-HEALING) DE TESTS DE CONTRATO (QA-TESTER)
+                            max_qa_retries = 3
+                            passed_tests = False
+                            last_test_output = ""
+
+                            for qa_attempt in range(1, max_qa_retries + 1):
+                                test_result = subprocess.run([sys.argv[0], "test"], capture_output=True, text=True)
+                                last_test_output = (test_result.stdout or "") + (test_result.stderr or "")
+                                print(test_result.stdout)
+                                if test_result.stderr:
+                                    print(test_result.stderr)
+
+                                if test_result.returncode == 0:
+                                    passed_tests = True
+                                    break
+                                else:
+                                    if qa_attempt < max_qa_retries:
+                                        smooth_print(f"\n{YELLOW}🔄 [Self-Healing QA] Tests fallaron. Disparando auto-corrección con QA-Tester (Intento {qa_attempt}/{max_qa_retries})...{NC}\n", 0.05)
+                                        qa_heal_prompt = (
+                                            f"Sos el agente QA-Tester de Chelo-Harness.\n"
+                                            f"El archivo de pruebas {h_path.relative_to(Path.cwd())} falló contra el mock de Prism con este reporte:\n"
+                                            f"```\n{last_test_output[:800]}\n```\n\n"
+                                            f"Contrato openapi.yaml actual:\n"
+                                            f"```yaml\n{o_path.read_text(encoding='utf-8')[:1500]}\n```\n\n"
+                                            f"Tu tarea: Corregí el archivo Hurl para que las aserciones coincidan exactamente con la estructura del mock y el status code.\n"
+                                            f"REGLA HURL: Usá bloques [Asserts], validá con 'header \"sl-violations\" not exists' y 'jsonpath ... exists'.\n"
+                                            f"Devolvé ÚNICAMENTE el contenido plano del archivo .hurl sin explicaciones ni markdown."
+                                        )
+                                        heal_resp = chelo_gemini_client.generate_content(qa_heal_prompt)
+                                        if heal_resp.get("ok"):
+                                            fixed_hurl = heal_resp['text'].strip()
+                                            if fixed_hurl.startswith("```"):
+                                                import re
+                                                fixed_hurl = re.sub(r"^```[a-z]*\n", "", fixed_hurl)
+                                                fixed_hurl = re.sub(r"\n```$", "", fixed_hurl)
+                                            h_path.write_text(fixed_hurl, encoding="utf-8")
+                                            smooth_print(f"  {CYAN}✓ [QA-Tester]{NC} Archivo {h_path.name} auto-corregido. Re-probando...\n")
+                                            time.sleep(1)
+                                    else:
+                                        smooth_print(f"{RED}❌ Límite de auto-correcciones de QA alcanzado.{NC}\n")
 
                             # REPORTAR DE VUELTA AL LEAD-ARCHITECT (Cierre de ciclo / Retroalimentación)
                             feedback_prompt = (
@@ -1125,7 +1162,7 @@ def cmd_interactive_session():
                                 f"- Story-Agent: Creó {s_path.relative_to(Path.cwd())}\n"
                                 f"- Spec-Architect: Actualizó openapi.yaml con los esquemas y endpoints acordados.\n"
                                 f"- QA-Tester: Generó la suite {h_path.relative_to(Path.cwd())}\n"
-                                f"- Resultado de tests de contrato: {'PASARON CON ÉXITO' if test_result.returncode == 0 else 'FALLARON ALGUNAS PRUEBAS'}.\n\n"
+                                f"- Resultado de tests de contrato: {'PASARON CON ÉXITO' if passed_tests else 'FALLARON ALGUNAS PRUEBAS'}.\n\n"
                                 f"Informale al desarrollador este hito completado, hacé un balance del avance y preguntale si avanzamos al Backend-Dev o Frontend-Dev para este ticket."
                             )
 
