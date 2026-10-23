@@ -1032,6 +1032,62 @@ def cmd_interactive_session():
                 print("")
                 render_markdown_smooth(reply_turn)
                 print("")
+
+                # DETECCIÓN DE EJECUCIÓN: Si el Lead-Architect dice que dispara los agentes o el usuario confirmó ("si", "dale", "ok", "ejecutar")
+                user_agreed = user_input.lower() in ["si", "sí", "dale", "adelante", "ok", "arranca", "arrancá", "procede", "procedé", "ejecuta", "ejecutar"]
+                architect_trigger = any(kw in reply_turn.lower() for kw in ["ejecución de agentes", "se están disparando los siguientes agentes", "iniciando el primer ciclo"])
+
+                if user_agreed and architect_trigger:
+                    smooth_print(f"\n{BOLD}{BLUE}⚙️  MATERIALIZANDO ARTEFACTOS SPEC-FIRST (Story + OpenAPI + Hurl)...{NC}\n", 0.05)
+                    
+                    history_text = "\n".join([f"{m['role'].upper()}: {m['parts'][0]['text']}" for m in conversation_history[-4:]])
+                    artifact_prompt = (
+                        f"Sos el orquestador técnico de Chelo-Harness.\n"
+                        f"En base a los requerimientos acordados:\n{history_text}\n\n"
+                        f"Debés generar los 3 artefactos técnicos formales con exactitud y calidad Spec-First:\n"
+                        f"1. docs/stories/US-001-gestion-tripulantes.md (Historia BDD con Definición Ágil, Escenarios Gherkin Given/When/Then, y Lista Blanca de Endpoints)\n"
+                        f"2. openapi.yaml (Especificación OpenAPI 3.0 completa, schemas con types, examples, properties y error responses)\n"
+                        f"3. tests/001_crew_management.hurl (Tests de contrato Hurl contra http://localhost:4010 con 'HTTP 200', 'header sl-violations not exists', y jsonpath assertions)\n\n"
+                        f"Devolvé ÚNICAMENTE un JSON válido (sin backticks de markdown ni texto extra) con este schema:\n"
+                        f"{{\n"
+                        f'  "story_path": "docs/stories/US-001-gestion-tripulantes.md",\n'
+                        f'  "story_content": "...",\n'
+                        f'  "openapi_content": "...",\n'
+                        f'  "hurl_path": "tests/001_crew_management.hurl",\n'
+                        f'  "hurl_content": "..."\n'
+                        f"}}"
+                    )
+
+                    art_resp = chelo_gemini_client.generate_content(artifact_prompt)
+                    if art_resp.get("ok"):
+                        raw_json = art_resp['text'].strip()
+                        if raw_json.startswith("```"):
+                            import re
+                            raw_json = re.sub(r"^```[a-z]*\n", "", raw_json)
+                            raw_json = re.sub(r"\n```$", "", raw_json)
+                        try:
+                            art_data = json.loads(raw_json)
+                            s_path = Path.cwd() / art_data.get("story_path", "docs/stories/001-crew.md")
+                            s_path.parent.mkdir(parents=True, exist_ok=True)
+                            s_path.write_text(art_data.get("story_content", ""), encoding="utf-8")
+                            smooth_print(f"  {GREEN}✓ [Story-Agent]{NC} Creado {CYAN}{s_path.relative_to(Path.cwd())}{NC}")
+
+                            o_path = Path.cwd() / "openapi.yaml"
+                            o_path.write_text(art_data.get("openapi_content", ""), encoding="utf-8")
+                            smooth_print(f"  {GREEN}✓ [Spec-Architect]{NC} Actualizado {CYAN}openapi.yaml{NC}")
+
+                            h_path = Path.cwd() / art_data.get("hurl_path", "tests/001_crew.hurl")
+                            h_path.parent.mkdir(parents=True, exist_ok=True)
+                            h_path.write_text(art_data.get("hurl_content", ""), encoding="utf-8")
+                            smooth_print(f"  {GREEN}✓ [QA-Tester]{NC} Creado {CYAN}{h_path.relative_to(Path.cwd())}{NC}")
+
+                            print("")
+                            smooth_print(f"{BOLD}{GREEN}🎉 Ciclo Spec-First generado con éxito. Verificando contrato con Prism Mock y Hurl...{NC}\n", 0.05)
+                            subprocess.run([sys.argv[0], "test"])
+                        except Exception as ex:
+                            smooth_print(f"{YELLOW}⚠️  Aviso al parsear artefactos automáticos: {ex}{NC}")
+                    else:
+                        smooth_print(f"{RED}Error generando artefactos: {art_resp.get('error')}{NC}")
             else:
                 smooth_print(f"{RED}Error: {resp_turn.get('error')}{NC}")
                 conversation_history.pop()
