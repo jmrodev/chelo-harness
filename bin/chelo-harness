@@ -1146,5 +1146,35 @@ def main():
     else:
         print_help()
 
+def handle_graceful_interrupt(signum, frame):
+    """Manejo elegante de Ctrl+C para pausar y ceder el control al orquestador."""
+    print(f"\n\n{YELLOW}⏸️  INTERRUPCIÓN DETECTADA (Ctrl+C).{NC}")
+    print(f"{CYAN}Pausando agente confinado y preservando el estado del repositorio...{NC}")
+    audit_changes_rule()
+    print(f"\n{BOLD}¿Qué deseás hacer?{NC}")
+    print("  [1] 💬 Hablar con el Lead-Architect para reorientar el plan")
+    print("  [2] 🔍 Ver git diff de lo avanzado hasta ahora")
+    print("  [3] ↩️  Descartar cambios de esta iteración (git restore)")
+    print("  [4] 🚪 Salir definitivamente")
+
+    try:
+        op = input(f"\n{BOLD}Seleccioná [1-4] (Default: 1): {NC}").strip()
+        if op == "2":
+            subprocess.run(["git", "diff"])
+        elif op == "3":
+            subprocess.run(["git", "restore", "."])
+            print(f"{GREEN}✓ Workspace restablecido.{NC}")
+        elif op == "4":
+            print(f"{YELLOW}Sesión finalizada por el usuario.{NC}")
+            sys.exit(0)
+
+        # Reabrir el orquestador
+        cmd_interactive_session()
+    except (KeyboardInterrupt, EOFError):
+        print(f"\n{YELLOW}Hasta luego.{NC}")
+        sys.exit(0)
+
 if __name__ == "__main__":
+    import signal
+    signal.signal(signal.SIGINT, handle_graceful_interrupt)
     main()
