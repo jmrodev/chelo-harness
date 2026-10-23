@@ -123,22 +123,47 @@ def run_pipeline(project_name: str, requirement: str, trace: bool = False):
     passed, errors = execute_tests_and_collect_errors()
 
     if not passed:
-        smooth_print(f"\n{YELLOW}🔄 Disparando reconciliación de contrato con Spec-Architect...{NC}\n", 0.05)
+        # Clasificar el tipo de falla para enviar al agente correcto
         err_report = "\n".join(errors)
-        log_trace(f"Error report entregado al Spec-Architect:\n{err_report}", trace)
-        fix_resp = run_agent_turn(
-            "spec-architect",
-            f"El test de contrato falló contra Prism con este error:\n{err_report}\n\n"
-            f"Corregí el openapi.yaml para satisfacer las respuestas y schemas requeridos.",
-            context=f"Historia:\n{story_content}\n\nOpenAPI actual:\n{spec_content}",
-            trace=trace
+        is_hurl_syntax_error = any(
+            kw in err_report for kw in ["Parsing predicate", "expecting a predicate", "Parsing error", "Invalid"]
         )
-        if fix_resp.get("ok"):
-            fixed_spec = strip_markdown_blocks(fix_resp.get("text", ""))
-            spec_path.write_text(fixed_spec, encoding="utf-8")
-            log_trace(f"Contrato reescrito en disco ({len(fixed_spec)} bytes)", trace)
-            smooth_print(f"  {CYAN}✓ [Spec-Architect]{NC} Contrato reconciliado. Re-probando...")
-            passed, _ = execute_tests_and_collect_errors()
+        is_contract_violation = "sl-violations" in err_report or "Assert failure" in err_report
+
+        if is_hurl_syntax_error:
+            smooth_print(f"\n{YELLOW}🔄 Error de sintaxis Hurl detectado — enviando al QA-Tester para corrección...{NC}\n", 0.05)
+            log_trace(f"Tipo de falla: SINTAXIS HURL. Agente corrector: qa-tester", trace)
+            fix_resp = run_agent_turn(
+                "qa-tester",
+                f"El archivo Hurl generado tiene errores de SINTAXIS que hurl no puede parsear:\n{err_report}\n\n"
+                f"Reescribí los tests Hurl completos usando ÚNICAMENTE sintaxis válida de Hurl. "
+                f"NUNCA uses 'is defined' — el predicado correcto es 'exists'. "
+                f"Recordá: cada bloque empieza con METHOD url, luego HTTP <status>, luego [Asserts].",
+                context=f"Contrato OpenAPI actual:\n{spec_content}",
+                trace=trace
+            )
+            if fix_resp.get("ok"):
+                fixed_hurl = strip_markdown_blocks(fix_resp.get("text", ""))
+                hurl_path.write_text(fixed_hurl, encoding="utf-8")
+                log_trace(f"Tests Hurl corregidos en disco ({len(fixed_hurl)} bytes)", trace)
+                smooth_print(f"  {CYAN}✓ [QA-Tester]{NC} Tests corregidos. Re-probando...")
+                passed, _ = execute_tests_and_collect_errors()
+        elif is_contract_violation:
+            smooth_print(f"\n{YELLOW}🔄 Violación de contrato detectada — enviando al Spec-Architect para reconciliación...{NC}\n", 0.05)
+            log_trace(f"Tipo de falla: VIOLACIÓN DE CONTRATO. Agente corrector: spec-architect", trace)
+            fix_resp = run_agent_turn(
+                "spec-architect",
+                f"El test de contrato falló contra Prism con este error:\n{err_report}\n\n"
+                f"Corregí el openapi.yaml para que los examples y schemas coincidan con lo que Prism devuelve.",
+                context=f"Historia:\n{story_content}\n\nOpenAPI actual:\n{spec_content}",
+                trace=trace
+            )
+            if fix_resp.get("ok"):
+                fixed_spec = strip_markdown_blocks(fix_resp.get("text", ""))
+                spec_path.write_text(fixed_spec, encoding="utf-8")
+                log_trace(f"Contrato reescrito en disco ({len(fixed_spec)} bytes)", trace)
+                smooth_print(f"  {CYAN}✓ [Spec-Architect]{NC} Contrato reconciliado. Re-probando...")
+                passed, _ = execute_tests_and_collect_errors()
 
     if passed:
         smooth_print(f"\n{BOLD}{GREEN}🎉 Pipeline Spec-First completado: Contrato válido y libre de violaciones.{NC}\n")

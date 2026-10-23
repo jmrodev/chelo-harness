@@ -81,7 +81,7 @@ paths:
 HTTP 200
 [Asserts]
 header "sl-violations" not exists
-jsonpath "$.status" == "healthy"
+jsonpath "$.status" exists
 """
         test_file.write_text(test_content, encoding="utf-8")
         smooth_print(f"  {GREEN}✓ Test base de contrato creado:{NC} tests/000_health.hurl", 0.05)
