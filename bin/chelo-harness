@@ -85,10 +85,16 @@ MAX_ALLOWED_CHANGES = 10
 PRISM_PORT = 4010
 BACKEND_PORT = 8000
 
+def smooth_print(text="", delay=0.03):
+    """Imprime texto de forma suave y legible para lectura humana."""
+    print(text, flush=True)
+    if delay > 0:
+        time.sleep(delay)
+
 def banner():
-    print(f"{CYAN}{BOLD}╔═══════════════════════════════════════════════════════════════════╗{NC}")
-    print(f"{CYAN}{BOLD}║         🛡️  CHELO-HARNESS — AGILE & CONTRACT RUNTIME               ║{NC}")
-    print(f"{CYAN}{BOLD}╚═══════════════════════════════════════════════════════════════════╝{NC}\n")
+    smooth_print(f"{CYAN}{BOLD}╔═══════════════════════════════════════════════════════════════════╗{NC}", 0.02)
+    smooth_print(f"{CYAN}{BOLD}║         🛡️  CHELO-HARNESS — AGILE & CONTRACT RUNTIME               ║{NC}", 0.02)
+    smooth_print(f"{CYAN}{BOLD}╚═══════════════════════════════════════════════════════════════════╝{NC}\n", 0.05)
 
 def check_git_repo():
     res = subprocess.run(["git", "rev-parse", "--is-inside-work-tree"], capture_output=True)
@@ -894,34 +900,38 @@ def cmd_interactive_session():
     check_git_repo()
     project = get_project_name()
 
-    print(f"📂 Proyecto detectado: {BOLD}{GREEN}{project}{NC}\n")
+    smooth_print(f"📂 Proyecto detectado: {BOLD}{GREEN}{project}{NC}\n", 0.05)
     cmd_daily_sync()
 
     view_mode = select_view_mode()
-    print(f"   {GREEN}✓ Modo visual activo:{NC} {view_mode.upper()}\n")
+    smooth_print(f"\n   {GREEN}✓ Modo visual activo:{NC} {view_mode.upper()}\n", 0.08)
 
-    print(f"{MAGENTA}{BOLD}🧙 ORQUESTACIÓN VIVA: LEAD-ARCHITECT (CHELO-HARNESS){NC}")
-    print(f"{CYAN}El Lead-Architect analizará el workspace contigo para definir gobernanza (AGENTS.md),{NC}")
-    print(f"{CYAN}revisar contratos y configurar agentes ad-hoc si la tarea lo amerita.{NC}\n")
+    smooth_print(f"{MAGENTA}{BOLD}🧙 ORQUESTACIÓN VIVA: LEAD-ARCHITECT (CHELO-HARNESS){NC}", 0.04)
+    smooth_print(f"{CYAN}El Lead-Architect analizará el workspace contigo para definir gobernanza (AGENTS.md),{NC}", 0.03)
+    smooth_print(f"{CYAN}revisar contratos y configurar agentes ad-hoc si la tarea lo amerita.{NC}\n", 0.05)
 
     system_prompt = get_agent_prompt("lead-architect")
     runner_opencode = find_opencode_runner()
 
     if runner_opencode:
-        print(f"{GREEN}Iniciando sesión viva con el Lead-Architect (OpenCode)...{NC}\n")
+        smooth_print(f"{GREEN}Iniciando sesión viva con el Lead-Architect (OpenCode)...{NC}\n", 0.1)
         intro = (
             f"{system_prompt}\n\n"
             f"El desarrollador acaba de iniciar una sesión de trabajo en el proyecto '{project}'.\n"
             f"Saludalo con tono profesional y preguntale qué objetivo o feature técnica/negocio planea encarar hoy."
         )
-        subprocess.run([runner_opencode, "run", intro])
+        try:
+            subprocess.run([runner_opencode, "run", intro])
+        except KeyboardInterrupt:
+            pass
         audit_changes_rule()
     else:
-        print(f"{YELLOW}OpenCode no está presente para abrir el diálogo directo en terminal.{NC}")
+        smooth_print(f"{YELLOW}OpenCode no está presente para abrir el diálogo directo en terminal.{NC}", 0.05)
         if shutil.which("wl-copy") and system_prompt:
             subprocess.run(f"printf '%s' \"{system_prompt}\" | wl-copy", shell=True)
-            print(f"{GREEN}✓ Prompt del Lead-Architect copiado al portapapeles.{NC} Pegalo en tu chat de AGY o Claude.")
+            smooth_print(f"{GREEN}✓ Prompt del Lead-Architect copiado al portapapeles.{NC} Pegalo en tu chat de AGY o Claude.", 0.05)
         else:
+            print(f"{CYAN}Instrucciones del Lead-Architect:{NC}\n{system_prompt}")
             print(f"{CYAN}Instrucciones del Lead-Architect:{NC}\n{system_prompt}")
 
 def get_agent_prompt(agent_name):
@@ -1147,15 +1157,19 @@ def main():
         print_help()
 
 def handle_graceful_interrupt(signum, frame):
-    """Manejo elegante de Ctrl+C para pausar y ceder el control al orquestador."""
-    print(f"\n\n{YELLOW}⏸️  INTERRUPCIÓN DETECTADA (Ctrl+C).{NC}")
-    print(f"{CYAN}Pausando agente confinado y preservando el estado del repositorio...{NC}")
-    audit_changes_rule()
-    print(f"\n{BOLD}¿Qué deseás hacer?{NC}")
-    print("  [1] 💬 Hablar con el Lead-Architect para reorientar el plan")
-    print("  [2] 🔍 Ver git diff de lo avanzado hasta ahora")
-    print("  [3] ↩️  Descartar cambios de esta iteración (git restore)")
-    print("  [4] 🚪 Salir definitivamente")
+    """Manejo elegante de Ctrl+C para pausar y ceder el control al orquestador sin trazas de Python."""
+    smooth_print(f"\n\n{YELLOW}⏸️  INTERRUPCIÓN DETECTADA (Ctrl+C).{NC}", 0.05)
+    smooth_print(f"{CYAN}Pausando agente confinado y preservando el estado del repositorio...{NC}\n", 0.05)
+    try:
+        audit_changes_rule()
+    except Exception:
+        pass
+
+    smooth_print(f"\n{BOLD}¿Qué deseás hacer?{NC}", 0.02)
+    smooth_print("  [1] 💬 Hablar con el Lead-Architect para reorientar el plan", 0.02)
+    smooth_print("  [2] 🔍 Ver git diff de lo avanzado hasta ahora", 0.02)
+    smooth_print("  [3] ↩️  Descartar cambios de esta iteración (git restore)", 0.02)
+    smooth_print("  [4] 🚪 Salir definitivamente", 0.02)
 
     try:
         op = input(f"\n{BOLD}Seleccioná [1-4] (Default: 1): {NC}").strip()
@@ -1163,15 +1177,16 @@ def handle_graceful_interrupt(signum, frame):
             subprocess.run(["git", "diff"])
         elif op == "3":
             subprocess.run(["git", "restore", "."])
-            print(f"{GREEN}✓ Workspace restablecido.{NC}")
+            smooth_print(f"{GREEN}✓ Workspace restablecido.{NC}")
         elif op == "4":
-            print(f"{YELLOW}Sesión finalizada por el usuario.{NC}")
+            smooth_print(f"{YELLOW}Sesión finalizada por el usuario.{NC}")
             sys.exit(0)
 
-        # Reabrir el orquestador
         cmd_interactive_session()
     except (KeyboardInterrupt, EOFError):
-        print(f"\n{YELLOW}Hasta luego.{NC}")
+        smooth_print(f"\n{YELLOW}Sesión interrumpida. Hasta luego.{NC}")
+        sys.exit(0)
+    except Exception:
         sys.exit(0)
 
 if __name__ == "__main__":
