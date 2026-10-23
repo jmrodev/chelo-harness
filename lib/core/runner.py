@@ -29,11 +29,21 @@ def find_opencode_runner():
     return None
 
 def get_agent_prompt(agent_name):
-    """Carga las directivas de un agente desde agents/<agent_name>.md."""
+    """Carga las directivas de un agente desde agents/<agent_name>.md.
+    Busca en el proyecto actual, en el binario instalado y en el repo fuente.
+    """
+    bin_path = Path(__file__).resolve()
     locations = [
+        # 1. Proyecto del usuario (por si el devs sobrescribe el agente)
         Path.cwd() / f"agents/{agent_name}.md",
+        # 2. Instalación local estándar
         Path.home() / f".local/share/chelo-harness/agents/{agent_name}.md",
-        Path(__file__).resolve().parent.parent.parent / f"agents/{agent_name}.md"
+        # 3. Junto al instalador ~/.local/lib/chelo/agents/
+        Path.home() / f".local/lib/chelo/agents/{agent_name}.md",
+        # 4. Raíz del repo fuente (cuando se corre desde el repo directamente)
+        bin_path.parent.parent.parent / f"agents/{agent_name}.md",
+        # 5. Un nivel más arriba del módulo por si la estructura varía
+        bin_path.parent.parent / f"agents/{agent_name}.md",
     ]
     for loc in locations:
         if loc.is_file():
