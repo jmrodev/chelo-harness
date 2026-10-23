@@ -868,10 +868,30 @@ def run_native_python_test(hurl_file):
         return False
 
 def execute_tests_and_collect_errors():
-    """Ejecuta los tests y devuelve (passed, lista_errores)."""
+    """Ejecuta los tests y devuelve (passed, lista_errores). Si el mock no está corriendo, lo levanta automáticamente en background."""
     hurl_files = sorted(list(Path.cwd().glob("**/*.hurl")))
     if not hurl_files:
         return False, ["No se encontraron archivos de test .hurl en el repositorio."]
+
+    # Verificar si el mock (:4010) está escuchando; si no, levantarlo en background
+    import socket
+    mock_running = False
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(0.5)
+        if s.connect_ex(("127.0.0.1", PRISM_PORT)) == 0:
+            mock_running = True
+
+    mock_proc = None
+    if not mock_running:
+        spec = find_openapi_spec()
+        runner = find_prism_runner()
+        if spec and runner:
+            mock_proc = subprocess.Popen(
+                runner + ["mock", str(spec), "-p", str(PRISM_PORT)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+            time.sleep(1.5)
 
     hurl_bin = find_hurl_runner()
     failed = 0
@@ -900,6 +920,13 @@ def execute_tests_and_collect_errors():
             if err:
                 print(f"{YELLOW}{err[:300]}{NC}")
                 errors.append(f"Archivo: {hf.name}\nDetalle:\n{err}")
+
+    if mock_proc:
+        mock_proc.terminate()
+        try:
+            mock_proc.wait(timeout=2)
+        except Exception:
+            mock_proc.kill()
 
     if failed == 0:
         print(f"\n{GREEN}{BOLD}✓ TODAS LAS PRUEBAS SUPERADAS SIN VIOLACIONES DE CONTRATO.{NC}\n")
@@ -1054,7 +1081,7 @@ def cmd_interactive_session():
                         f"En base a los requerimientos acordados:\n{history_text}\n\n"
                         f"Debés generar los 3 artefactos técnicos formales con exactitud y calidad Spec-First:\n"
                         f"1. docs/stories/US-001-gestion-tripulantes.md (Historia BDD con Definición Ágil, Escenarios Gherkin Given/When/Then, y Lista Blanca de Endpoints)\n"
-                        f"2. openapi.yaml (Especificación OpenAPI 3.0 completa, schemas con types, examples, properties y error responses)\n"
+                        f"2. openapi.yaml (Especificación OpenAPI 3.0 completa, SIN bloque servers para evitar descalces de prefijo, con /health y las rutas acordadas con schemas y examples)\n"
                         f"3. tests/001_crew_management.hurl (Tests de contrato Hurl contra http://localhost:4010 con 'HTTP 200', 'header sl-violations not exists', y jsonpath assertions)\n\n"
                         f"Devolvé ÚNICAMENTE un JSON válido (sin backticks de markdown ni texto extra) con este schema:\n"
                         f"{{\n"
