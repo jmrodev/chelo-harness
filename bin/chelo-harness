@@ -21,6 +21,7 @@ from lib.ui.console import banner, smooth_print, RED, GREEN, YELLOW, CYAN, BOLD,
 from lib.core.gate import check_git_repo, audit_changes_rule
 from lib.core.setup import cmd_setup, cmd_doctor
 from lib.core.init_project import cmd_init
+from lib.core.startup import check_credentials_and_stack
 from lib.core.orchestrator import run_pipeline, get_project_name
 from lib.spec.mock_engine import cmd_mock, cmd_proxy, BACKEND_PORT
 from lib.spec.tester import cmd_test
@@ -54,12 +55,15 @@ def cmd_interactive(trace: bool = False):
     check_git_repo()
     project = get_project_name()
     smooth_print(f"📂 Proyecto activo: {BOLD}{GREEN}{project}{NC}\n", 0.05)
-    
+
+    if not check_credentials_and_stack(trace=trace):
+        return
+
     prompt = input(f"{BOLD}{CYAN}👉 ¿Qué objetivo o requerimiento vas a encarar hoy? (o 'salir'): {NC}").strip()
     if not prompt or prompt.lower() in ["salir", "exit", "quit", "q"]:
         smooth_print(f"{YELLOW}Sesión finalizada.{NC}")
         return
-        
+
     run_pipeline(project, prompt, trace=trace)
 
 def print_help():
