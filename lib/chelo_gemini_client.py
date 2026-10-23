@@ -32,6 +32,10 @@ def generate_content(prompt_or_contents, system_instruction=None, model="gemini-
     else:
         return {"ok": False, "error": "Formato de prompt inválido"}
 
+    if isinstance(contents, list) and len(contents) > 10:
+        # Mantener el primer turno (setup) y los últimos 8 turnos
+        contents = [contents[0]] + contents[-8:]
+
     payload = {"contents": contents}
     if system_instruction:
         payload["systemInstruction"] = {

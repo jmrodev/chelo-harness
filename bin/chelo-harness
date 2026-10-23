@@ -1039,6 +1039,7 @@ def cmd_interactive_session():
                 print("")
 
         # Bucle interactivo continuo (REPL) con memoria conversacional acumulada
+        artifacts_already_generated = False
         while True:
             user_input = input(f"{BOLD}{CYAN}👉 Vos (o 'salir'): {NC}").strip()
             if not user_input or user_input.lower() in ["salir", "exit", "quit", "q"]:
@@ -1062,17 +1063,11 @@ def cmd_interactive_session():
 
                 # DETECCIÓN DE EJECUCIÓN ROBUSTA:
                 user_agreed = user_input.lower().strip() in ["si", "sí", "dale", "adelante", "ok", "arranca", "arrancá", "procede", "procedé", "ejecuta", "ejecutar"]
-                
-                # Gatillo si el arquitecto emitió la señal [DISPARAR AGENTES] o si habla de ejecución/trabajo en progreso
-                architect_keywords = [
-                    "[disparar agentes]", "ejecución de agentes", "se están disparando",
-                    "iniciando el primer ciclo", "el proceso está en marcha", "continúan trabajando",
-                    "están activamente trabajando", "continúan su labor"
-                ]
-                architect_trigger = any(kw in reply_turn.lower() for kw in architect_keywords)
+                architect_explicit = "[disparar agentes]" in reply_turn.lower()
 
-                if user_agreed or "[disparar agentes]" in reply_turn.lower():
-                    # Solo materializar si no se materializó ya en este mismo ticket o si hay disparador
+                # Disparar solo UNA VEZ por ciclo cuando se acuerde
+                if not artifacts_already_generated and (user_agreed or architect_explicit):
+                    artifacts_already_generated = True
                     smooth_print(f"\n{BOLD}{BLUE}⚙️  ORQUESTADOR EN ACCIÓN: Materializando artefactos físicos con Story, Spec y QA...{NC}\n", 0.05)
                     
                     history_text = "\n".join([f"{m['role'].upper()}: {m['parts'][0]['text']}" for m in conversation_history[-4:]])
