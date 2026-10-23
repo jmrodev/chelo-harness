@@ -938,6 +938,8 @@ def execute_tests_and_collect_errors():
 def cmd_test():
     banner()
     passed, _ = execute_tests_and_collect_errors()
+    if not passed:
+        sys.exit(1)
     return passed
 
 def select_view_mode():
