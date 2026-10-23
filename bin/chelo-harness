@@ -9,12 +9,13 @@ import os
 import subprocess
 from pathlib import Path
 
-# Inyectar rutas de módulos
+# Inyectar rutas de módulos: el repo en desarrollo gana sobre la copia instalada.
 REPO_ROOT = Path(__file__).resolve().parent.parent
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
 INSTALL_LIB = Path.home() / ".local/lib/chelo"
-if INSTALL_LIB.is_dir() and str(INSTALL_LIB) not in sys.path:
+
+if (REPO_ROOT / "lib" / "__init__.py").is_file():
+    sys.path.insert(0, str(REPO_ROOT))
+elif INSTALL_LIB.is_dir():
     sys.path.insert(0, str(INSTALL_LIB))
 
 from lib.ui.console import banner, smooth_print, RED, GREEN, YELLOW, CYAN, BOLD, NC
@@ -22,7 +23,9 @@ from lib.core.gate import check_git_repo, audit_changes_rule
 from lib.core.setup import cmd_setup, cmd_doctor
 from lib.core.init_project import cmd_init
 from lib.core.startup import check_credentials_and_stack
-from lib.core.orchestrator import run_pipeline, get_project_name
+from lib.core.orchestrator import run_pipeline, get_project_name, cmd_story, cmd_agent, available_roles
+from lib.core.board import cmd_board_init, cmd_board_open
+from lib.chelo_channels import get_github_sprint_context, get_slack_messages
 from lib.spec.mock_engine import cmd_mock, cmd_proxy, BACKEND_PORT
 from lib.spec.tester import cmd_test
 
@@ -66,6 +69,49 @@ def cmd_interactive(trace: bool = False):
 
     run_pipeline(project, prompt, trace=trace)
 
+def cmd_sync():
+    """Daily Scrum sin escribir nada: Slack + milestones de GitHub."""
+    banner()
+    check_git_repo()
+    print(f"{CYAN}📡 Sincronizando Daily Scrum...{NC}\n")
+
+    slack = get_slack_messages()
+    if slack.get("ok"):
+        print(f"{GREEN}✓ Slack{NC} (#{slack.get('channel')}):")
+        messages = slack.get("messages", [])
+        if not messages:
+            print(f"  {YELLOW}○ sin mensajes recientes{NC}")
+        for message in messages:
+            text = " ".join(message.get("text", "").split())
+            print(f"  {YELLOW}•{NC} {text[:160]}")
+    else:
+        print(f"{YELLOW}○ Slack:{NC} {slack.get('error')}")
+
+    print()
+    github = get_github_sprint_context()
+    if github.get("ok"):
+        milestone = github.get("milestone")
+        if milestone:
+            print(
+                f"{GREEN}✓ Milestone:{NC} {milestone.get('title')} "
+                f"({milestone.get('open_issues', 0)} abiertos / {milestone.get('closed_issues', 0)} cerrados)"
+            )
+        else:
+            print(f"{YELLOW}○ Milestone:{NC} sin milestone abierto")
+
+        issues = github.get("issues", [])
+        print(f"{GREEN}✓ Issues abiertos:{NC} {len(issues)}")
+        for issue in issues[:10]:
+            labels = ", ".join(label.get("name", "") for label in issue.get("labels", []))
+            suffix = f" [{labels}]" if labels else ""
+            print(f"  {YELLOW}•{NC} #{issue.get('number')} {issue.get('title')}{suffix}")
+        if len(issues) > 10:
+            print(f"  {YELLOW}… y {len(issues) - 10} más{NC}")
+    else:
+        print(f"{YELLOW}○ GitHub:{NC} {github.get('error')}")
+    print("")
+
+
 def print_help():
     banner()
     print(f"{BOLD}USO:{NC}")
@@ -76,12 +122,18 @@ def print_help():
     print("  chelo-harness init              Inicializa openapi.yaml, AGENTS.md y tests base")
     print("  chelo-harness setup             Configura API keys y entorno")
     print("  chelo-harness doctor            Diagnostica herramientas instaladas")
+    print("  chelo-harness sync              Daily Scrum: Slack + milestone e issues de GitHub")
+    print("  chelo-harness story             Entrevista con el Story-Agent y escribe la User Story BDD")
+    print("  chelo-harness agent <rol>       Agente confinado autónomo (lee, lista y escribe en docs/)")
+    print("  chelo-harness board init        Inyecta el Daily Board (GitHub Pages) en el repo")
+    print("  chelo-harness board open        Abre el Daily Board del repositorio en el navegador")
     print("  chelo-harness mock              Levanta el servidor Mock (Prism / Nativo en :4010)")
     print("  chelo-harness proxy [url]       Proxy validador de tráfico contra backend real")
     print("  chelo-harness test              Ejecuta las pruebas Hurl contra el contrato")
     print("  chelo-harness gate              Ejecuta Quality Gate completo (10 cambios + Tests)")
     print("  chelo-harness commit \"<msg>\"    Commitea con validaciones de gobernanza")
     print("  chelo-harness status            Verifica el disyuntor de archivos")
+    print(f"\n{BOLD}ROLES DISPONIBLES:{NC} {', '.join(available_roles()) or '(ninguno)'}")
 
 def main():
     trace_mode = "--trace" in sys.argv or "--test" in sys.argv or "-v" in sys.argv
@@ -100,6 +152,20 @@ def main():
         cmd_setup()
     elif cmd in ["doctor", "check"]:
         cmd_doctor()
+    elif cmd == "sync":
+        cmd_sync()
+    elif cmd == "story":
+        cmd_story()
+    elif cmd == "agent":
+        cmd_agent(cleaned_args[2] if len(cleaned_args) > 2 else "")
+    elif cmd == "board":
+        action = cleaned_args[2] if len(cleaned_args) > 2 else ""
+        if action == "init":
+            cmd_board_init()
+        elif action == "open":
+            cmd_board_open()
+        else:
+            print(f"{YELLOW}Uso:{NC} chelo-harness board init|open")
     elif cmd == "mock":
         cmd_mock()
     elif cmd == "proxy":
