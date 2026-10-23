@@ -734,31 +734,30 @@ def run_native_python_test(hurl_file):
     except Exception as e:
         return False
 
-def cmd_test():
-    banner()
+def execute_tests_and_collect_errors():
+    """Ejecuta los tests y devuelve (passed, lista_errores)."""
     hurl_files = sorted(list(Path.cwd().glob("**/*.hurl")))
     if not hurl_files:
-        print(f"{YELLOW}⚠️  No se encontraron archivos de test .hurl en el repositorio.{NC}")
-        return False
+        return False, ["No se encontraron archivos de test .hurl en el repositorio."]
 
     hurl_bin = find_hurl_runner()
-    print(f"{BLUE}▶ Ejecutando {len(hurl_files)} pruebas de contrato {'(con binario Hurl)' if hurl_bin else '(runner nativo Python)'}...{NC}\n")
     failed = 0
+    errors = []
+
     for hf in hurl_files:
         print(f"   🧪 Testeando {hf.name}...", end=" ", flush=True)
         if hurl_bin:
             res = subprocess.run([hurl_bin, "--test", str(hf)], capture_output=True, text=True)
             passed = (res.returncode == 0)
             raw_err = (res.stderr or "").strip()
-            # Filtrar warnings de versionado de bibliotecas compartidas (ej. libxml2)
             filtered_lines = [
                 line for line in raw_err.splitlines()
                 if "no version information available" not in line
             ]
-            err = "\n".join(filtered_lines).strip()[:300]
+            err = "\n".join(filtered_lines).strip()
         else:
             passed = run_native_python_test(hf)
-            err = "El status code no coincidió con el esperado."
+            err = "El status code o payload no coincidió con lo esperado."
 
         if passed:
             print(f"{GREEN}PASÓ ✓{NC}")
@@ -766,14 +765,20 @@ def cmd_test():
             print(f"{RED}FALLÓ ✗{NC}")
             failed += 1
             if err:
-                print(f"{YELLOW}{err}{NC}")
+                print(f"{YELLOW}{err[:300]}{NC}")
+                errors.append(f"Archivo: {hf.name}\nDetalle:\n{err}")
 
     if failed == 0:
         print(f"\n{GREEN}{BOLD}✓ TODAS LAS PRUEBAS SUPERADAS SIN VIOLACIONES DE CONTRATO.{NC}\n")
-        return True
+        return True, []
     else:
         print(f"\n{RED}{BOLD}❌ {failed} prueba(s) fallaron contra el contrato OpenAPI.{NC}\n")
-        return False
+        return False, errors
+
+def cmd_test():
+    banner()
+    passed, _ = execute_tests_and_collect_errors()
+    return passed
 
 def cmd_interactive_session():
     banner()
@@ -876,6 +881,32 @@ def cmd_agent(role):
         print(f"{GREEN}Ejecutando con OpenCode confinado en sus reglas...{NC}")
         subprocess.run([runner_opencode, "run", prompt_content])
         audit_changes_rule()
+
+        # Feedback Loop para roles de implementación / QA
+        if role in ["back", "qa", "front"]:
+            max_retries = 3
+            for attempt in range(1, max_retries + 1):
+                print(f"\n{BLUE}▶ Verificando cumplimiento de contrato (Intento {attempt}/{max_retries})...{NC}")
+                passed, errors = execute_tests_and_collect_errors()
+                if passed:
+                    print(f"{GREEN}{BOLD}✓ El agente resolvió la tarea y todos los tests de contrato pasaron.{NC}")
+                    break
+                else:
+                    if attempt == max_retries:
+                        print(f"{RED}❌ Límite de auto-correcciones alcanzado. Se requiere intervención manual.{NC}")
+                        break
+
+                    error_msg = "\n---\n".join(errors)
+                    feedback_prompt = (
+                        f"REPORTE DE FALLO DE CONTRATO (SELF-HEALING FEEDBACK):\n\n"
+                        f"Los tests Hurl fallaron con los siguientes errores:\n{error_msg}\n\n"
+                        f"TU TAREA: Analizá el error exacto y modificá el código para que las aserciones pasen.\n"
+                        f"REGLA SAGRADA: NO modifiques el contrato openapi.yaml ni relajes los tests .hurl para que pasen más fácil.\n"
+                        f"Preservá el confinamiento (máximo 10 archivos)."
+                    )
+                    print(f"\n{YELLOW}🔄 Test fallido detectado. Inyectando feedback de error al agente para auto-corrección...{NC}\n")
+                    subprocess.run([runner_opencode, "run", feedback_prompt])
+                    audit_changes_rule()
     else:
         if shutil.which("wl-copy"):
             subprocess.run(f"printf '%s' \"{prompt_content}\" | wl-copy", shell=True)
