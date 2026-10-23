@@ -4,6 +4,8 @@ Handlers de agentes: turno individual y pipeline Spec-First completo.
 
 from pathlib import Path
 
+from lib.core.paths import resolve_within
+
 from ..runtime import agents_dir, enter, invoke
 
 
@@ -40,7 +42,9 @@ def h_agent_turn(args):
         content = strip_markdown_blocks(response.get("text", ""))
         written = None
         if args.get("out_path"):
-            target = Path.cwd() / args["out_path"]
+            target = resolve_within(args["out_path"], Path.cwd())
+            if target is None:
+                return {"ok": False, "error": f"out_path fuera del workspace: {args['out_path']}"}
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(content, encoding="utf-8")
             written = str(target)

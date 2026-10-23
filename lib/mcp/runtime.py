@@ -59,15 +59,25 @@ def invoke(fn, *args, **kwargs):
 # ---------------------------------------------------------------------------
 # Workspace
 # ---------------------------------------------------------------------------
+class InvalidWorkspace(Exception):
+    """El `workspace` pedido explícitamente no existe o no es un directorio."""
+
+
 @contextlib.contextmanager
 def enter(args):
-    """Cambia al workspace indicado y restaura el cwd al salir."""
+    """
+    Cambia al workspace indicado y restaura el cwd al salir.
+
+    Si el cliente pidió un workspace explícito y no existe, se falla: caer al
+    cwd del servidor devolvería éxito operando sobre otro repositorio.
+    """
     previous = Path.cwd()
     target = (args or {}).get("workspace")
     if target:
         candidate = Path(os.path.expanduser(str(target))).resolve()
-        if candidate.is_dir():
-            os.chdir(candidate)
+        if not candidate.is_dir():
+            raise InvalidWorkspace(f"El workspace no existe o no es un directorio: {candidate}")
+        os.chdir(candidate)
     try:
         yield Path.cwd()
     finally:

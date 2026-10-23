@@ -38,6 +38,22 @@ def parse_openapi_paths(text):
     return paths
 
 
+def _spec_path(spec, root):
+    """
+    Resuelve el contrato y exige que quede dentro del workspace.
+
+    El contrato autodetectado suele venir como ruta absoluta, así que acá no se
+    rechazan las absolutas: se verifica contención.
+    """
+    path = Path(spec)
+    if not path.is_absolute():
+        path = root / path
+    path = path.resolve()
+    if path != root and root not in path.parents:
+        return None
+    return path
+
+
 def h_spec_read(args):
     with enter(args) as root:
         from lib.spec.mock_engine import find_openapi_spec
@@ -46,9 +62,9 @@ def h_spec_read(args):
         if not spec:
             return {"found": False, "error": "No hay openapi.yaml en el workspace. Usá chelo_init."}
 
-        path = Path(spec)
-        if not path.is_absolute():
-            path = (root / path).resolve()
+        path = _spec_path(spec, root)
+        if path is None:
+            return {"found": False, "error": f"Ruta fuera del workspace: {spec}"}
         if not path.is_file():
             return {"found": False, "error": f"Archivo inexistente: {path}"}
 

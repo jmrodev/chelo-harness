@@ -17,7 +17,10 @@ def cmd_init():
     # 1. Verificar git
     if not (cwd / ".git").exists():
         smooth_print(f"  {YELLOW}Inicializando repositorio git...{NC}", 0.05)
-        subprocess.run(["git", "init"], check=True)
+        # capture_output es obligatorio: git hereda el fd 1 del proceso. En el
+        # servidor MCP ese fd es el canal JSON-RPC, y redirect_stdout no alcanza
+        # a un subproceso.
+        subprocess.run(["git", "init"], check=True, capture_output=True, text=True)
 
     # 2. Docs y directivas
     docs_dir = cwd / "docs"
