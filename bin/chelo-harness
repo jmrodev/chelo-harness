@@ -395,11 +395,36 @@ jsonpath "$.status" == "ok"
             f.write(hurl_content)
         print(f"  {GREEN}✓ Primer test de contrato creado:{NC} tests/000_health.hurl")
 
-    # 6. Docs inicial
+    # 6. Docs inicial y directorio de stories
+    stories_dir = docs_dir / "stories"
+    stories_dir.mkdir(exist_ok=True)
     readme_docs = docs_dir / "00-arquitectura.md"
     if not readme_docs.exists():
         with open(readme_docs, "w", encoding="utf-8") as f:
             f.write(f"# Arquitectura del Proyecto {cwd.name}\n\nDocumentación viva de contratos y diagramas Mermaid.\n")
+
+    # 7. Plantilla oficial AGENTS.md (Reglas de Gobernanza para agentes)
+    agents_file = cwd / "AGENTS.md"
+    if not agents_file.exists():
+        agents_content = """# Reglas de Gobernanza Chelo-Harness (Spec-First)
+
+## 1. PRINCIPIO SAGRADO: DESACOPLAMIENTO TOTAL
+- El Backend y el Frontend NO se comunican directamente en etapa de diseño ni se esperan para desarrollar.
+- La ÚNICA fuente de verdad compartida es `openapi.yaml`.
+- El Frontend consume `http://localhost:4010` (Prism Mock Server).
+- El Backend implementa la lógica contra `:8000` validada por `chelo-harness test` y `chelo-harness proxy`.
+
+## 2. RESTRICCIÓN DE ENDPOINTS (ANTI-ALUCINACIÓN)
+- Queda terminantemente PROHIBIDO declarar endpoints especulativos ("por las dudas") o CRUDs completos no pedidos.
+- Todo endpoint DEBE provenir de un User Story formal en `docs/stories/*.md` y de sus criterios BDD (Given / When / Then).
+
+## 3. LÍMITE DE CONTENCIÓN
+- Máximo 10 archivos modificados por ticket (Freno de seguridad del Quality Gate).
+- Todo cambio de endpoint requiere su correspondiente prueba `.hurl` en `tests/`.
+"""
+        with open(agents_file, "w", encoding="utf-8") as f:
+            f.write(agents_content)
+        print(f"  {GREEN}✓ Constitución de gobernanza creada:{NC} AGENTS.md")
 
     print(f"\n{GREEN}{BOLD}🎉 ¡Proyecto inicializado con éxito!{NC}")
     print(f"{CYAN}Para probar el ciclo en 10 segundos:{NC}")
@@ -938,6 +963,82 @@ def cmd_interactive_session():
         print(prompt_confinado)
         print(f"--------------------------------------------------")
 
+def get_agent_prompt(agent_name):
+    """Obtiene el prompt de un agente especializado desde local o fallback empaquetado."""
+    candidates = [
+        Path.cwd() / "agents" / f"{agent_name}.md",
+        Path.home() / ".local/share/chelo/agents" / f"{agent_name}.md",
+        Path(__file__).resolve().parent.parent / "agents" / f"{agent_name}.md"
+    ]
+    for c in candidates:
+        if c.is_file():
+            return c.read_text(encoding="utf-8")
+    return None
+
+def cmd_story():
+    banner()
+    check_git_repo()
+    print(f"{BLUE}🧠 AGENTE PRODUCT OWNER / STORY-ARCHITECT{NC}\n")
+    print(f"{CYAN}Este agente te entrevistará para aterrizar un requerimiento en una Historia de Usuario (BDD).{NC}")
+    print(f"{YELLOW}Regla: Ningún endpoint se creará en el contrato sin estar autorizado en esta historia.{NC}\n")
+
+    stories_dir = Path.cwd() / "docs" / "stories"
+    stories_dir.mkdir(parents=True, exist_ok=True)
+
+    system_prompt = get_agent_prompt("story-agent")
+    runner_opencode = find_opencode_runner()
+
+    if runner_opencode:
+        print(f"{GREEN}Iniciando sesión conversacional interactiva con el Story-Agent (OpenCode)...{NC}\n")
+        intro_prompt = (
+            f"{system_prompt}\n\n"
+            f"El usuario quiere definir, modificar o auditar una Historia de Usuario para el proyecto actual.\n"
+            f"Saludalo brevemente y hacé tu primera pregunta para entender el problema de negocio y el actor beneficiario."
+        )
+        subprocess.run([runner_opencode, "run", intro_prompt])
+    else:
+        print(f"{YELLOW}OpenCode no está instalado para correr el agente por terminal.{NC}")
+        if shutil.which("wl-copy") and system_prompt:
+            subprocess.run(f"printf '%s' \"{system_prompt}\" | wl-copy", shell=True)
+            print(f"{GREEN}✓ Prompt del Story-Agent copiado al portapapeles.{NC} Pegalo en tu chat de AGY o Claude.")
+        else:
+            print(f"{CYAN}Instrucciones del Story-Agent:{NC}\n{system_prompt}")
+
+def cmd_agent(role):
+    banner()
+    check_git_repo()
+    roles = {
+        "story": "story-agent",
+        "spec": "spec-architect",
+        "qa": "qa-tester",
+        "front": "frontend-dev",
+        "back": "backend-dev"
+    }
+    if role not in roles:
+        print(f"{RED}❌ Rol de agente desconocido: '{role}'{NC}")
+        print(f"{YELLOW}Roles disponibles: story, spec, qa, front, back{NC}")
+        sys.exit(1)
+
+    agent_id = roles[role]
+    prompt_content = get_agent_prompt(agent_id)
+    if not prompt_content:
+        print(f"{RED}❌ No se encontró la definición del agente '{agent_id}'.{NC}")
+        sys.exit(1)
+
+    print(f"{BLUE}🚀 AGENTE CONFINADO:{NC} {BOLD}{agent_id.upper()}{NC}\n")
+    runner_opencode = find_opencode_runner()
+
+    if runner_opencode:
+        print(f"{GREEN}Ejecutando con OpenCode confinado en sus reglas...{NC}")
+        subprocess.run([runner_opencode, "run", prompt_content])
+        audit_changes_rule()
+    else:
+        if shutil.which("wl-copy"):
+            subprocess.run(f"printf '%s' \"{prompt_content}\" | wl-copy", shell=True)
+            print(f"{GREEN}✓ Prompt del agente copiado al portapapeles.{NC} Pegalo en AGY, Cursor o Claude.")
+        else:
+            print(prompt_content)
+
 def cmd_gate():
     banner()
     check_git_repo()
@@ -988,6 +1089,8 @@ def print_help():
     print("  chelo-harness update            Actualiza chelo-harness y todas sus herramientas al día")
     print("  chelo-harness sync              Sincronización Daily Scrum (Slack #practicas + Milestones GitHub)")
     print("  chelo-harness board [open|init] Abre el Daily Board o inyecta su GitHub Pages con one-liner")
+    print("  chelo-harness story             Inicia entrevista con Story-Agent (Product Owner) para definir BDD")
+    print("  chelo-harness agent <rol>       Lanza agente confinado (story, spec, qa, front, back)")
     print("  chelo-harness mock              Levanta Prism Mock Server (:4010) leyendo el openapi.yaml")
     print("  chelo-harness proxy [url]       Levanta Prism Proxy validador contra backend real (:8000)")
     print("  chelo-harness test              Ejecuta la suite de pruebas Hurl (*.hurl) contra el contrato")
@@ -1013,6 +1116,13 @@ def main():
         cmd_update()
     elif cmd in ["sync", "daily", "novedades"]:
         cmd_daily_sync()
+    elif cmd in ["story", "historias", "po"]:
+        cmd_story()
+    elif cmd in ["agent", "agente"]:
+        if len(sys.argv) < 3:
+            print(f"{RED}Falta el rol. Uso: chelo-harness agent <story|spec|qa|front|back>{NC}")
+            sys.exit(1)
+        cmd_agent(sys.argv[2])
     elif cmd == "board":
         sub = sys.argv[2] if len(sys.argv) > 2 else "open"
         cmd_board(sub)

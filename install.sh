@@ -6,8 +6,9 @@ echo "🛡️  Instalando Chelo-Harness..."
 
 BIN_DIR="$HOME/.local/bin"
 LIB_DIR="$HOME/.local/lib/chelo"
+AGENTS_DIR="$HOME/.local/share/chelo/agents"
 
-mkdir -p "$BIN_DIR" "$LIB_DIR"
+mkdir -p "$BIN_DIR" "$LIB_DIR" "$AGENTS_DIR"
 
 BASE_URL="https://raw.githubusercontent.com/jmrodev/chelo-harness/main"
 
@@ -17,6 +18,11 @@ chmod +x "$BIN_DIR/chelo-harness"
 
 # Descargar librería de canales
 curl -fsSL "$BASE_URL/lib/chelo_channels.py" -o "$LIB_DIR/chelo_channels.py"
+
+# Descargar roles de agentes confinados
+for agent in story-agent spec-architect qa-tester frontend-dev backend-dev; do
+  curl -fsSL "$BASE_URL/agents/${agent}.md" -o "$AGENTS_DIR/${agent}.md" 2>/dev/null || true
+done
 
 echo "✓ Chelo-Harness instalado en $BIN_DIR/chelo-harness"
 echo ""

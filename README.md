@@ -50,6 +50,8 @@ flowchart TD
 | `chelo-harness sync` | Consulta canales del equipo (Slack `#practicas`) y Milestones de GitHub. |
 | `chelo-harness board init` | Inyecta el tablero [Daily Board](https://github.com/jmrodev/daily-board) en GitHub Pages. |
 | `chelo-harness board open` | Abre el Daily Board del repositorio en el navegador. |
+| `chelo-harness story` | Inicia entrevista con **Story-Agent (Product Owner)** para modelar BDD. |
+| `chelo-harness agent <rol>` | Lanza un agente confinado (`story`, `spec`, `qa`, `front`, `back`). |
 | `chelo-harness mock` | Levanta **Prism Mock Server** en `:4010` leyendo el `openapi.yaml`. |
 | `chelo-harness proxy [url]` | Levanta **Prism Proxy** validador contra el backend real en `:8000`. |
 | `chelo-harness test` | Ejecuta la batería de pruebas Hurl (`*.hurl`) contra el contrato. |
