@@ -16,8 +16,9 @@ BASE_URL="https://raw.githubusercontent.com/jmrodev/chelo-harness/main"
 curl -fsSL "$BASE_URL/bin/chelo-harness" -o "$BIN_DIR/chelo-harness"
 chmod +x "$BIN_DIR/chelo-harness"
 
-# Descargar librería de canales
+# Descargar librería de canales y ui dashboard
 curl -fsSL "$BASE_URL/lib/chelo_channels.py" -o "$LIB_DIR/chelo_channels.py"
+curl -fsSL "$BASE_URL/lib/ui_dashboard.py" -o "$LIB_DIR/ui_dashboard.py"
 
 # Descargar roles de agentes confinados
 for agent in lead-architect story-agent spec-architect qa-tester frontend-dev backend-dev git-agent; do
