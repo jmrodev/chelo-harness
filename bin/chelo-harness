@@ -980,41 +980,61 @@ def cmd_interactive_session():
         full_system = f"{system_prompt}\n{test_instruction}"
         initial_prompt = f"El desarrollador acaba de iniciar una sesión en el proyecto '{project}'. Saludalo con tono profesional y preguntale qué objetivo o feature técnica/negocio planea encarar hoy."
 
-        conversation_history = [
-            {"role": "user", "parts": [{"text": initial_prompt}]}
-        ]
+        # Cargar historial previo si existe para reanudar sesiones
+        history_file = Path.cwd() / ".chelo_history.json"
+        conversation_history = []
+        if history_file.is_file():
+            try:
+                conversation_history = json.loads(history_file.read_text(encoding="utf-8"))
+            except Exception:
+                conversation_history = []
 
-        resp = chelo_gemini_client.generate_content(conversation_history, system_instruction=full_system)
-        if resp.get("ok"):
-            model_reply = resp['text']
-            conversation_history.append({"role": "model", "parts": [{"text": model_reply}]})
-            print("")
-            render_markdown_smooth(model_reply)
-            print("")
-            
-            # Bucle interactivo continuo (REPL) con memoria conversacional acumulada
-            while True:
-                user_input = input(f"{BOLD}{CYAN}👉 Vos (o 'salir'): {NC}").strip()
-                if not user_input or user_input.lower() in ["salir", "exit", "quit", "q"]:
-                    smooth_print(f"{YELLOW}Sesión con el Lead-Architect finalizada.{NC}")
-                    break
-
-                smooth_print(f"\n{CYAN}🧠 Lead-Architect analizando requerimiento...{NC}\n", 0.05)
-                conversation_history.append({"role": "user", "parts": [{"text": user_input}]})
-
-                resp_turn = chelo_gemini_client.generate_content(conversation_history, system_instruction=full_system)
-                if resp_turn.get("ok"):
-                    reply_turn = resp_turn['text']
-                    conversation_history.append({"role": "model", "parts": [{"text": reply_turn}]})
-                    print("")
-                    render_markdown_smooth(reply_turn)
-                    print("")
-                else:
-                    smooth_print(f"{RED}Error: {resp_turn.get('error')}{NC}")
-                    # Si falló la llamada, removemos el último mensaje del usuario para no corromper la alternancia de roles
-                    conversation_history.pop()
+        if not conversation_history:
+            conversation_history = [
+                {"role": "user", "parts": [{"text": initial_prompt}]}
+            ]
+            resp = chelo_gemini_client.generate_content(conversation_history, system_instruction=full_system)
+            if resp.get("ok"):
+                model_reply = resp['text']
+                conversation_history.append({"role": "model", "parts": [{"text": model_reply}]})
+                print("")
+                render_markdown_smooth(model_reply)
+                print("")
+                history_file.write_text(json.dumps(conversation_history, ensure_ascii=False, indent=2), encoding="utf-8")
+            else:
+                smooth_print(f"{RED}Error al conectar con Gemini: {resp.get('error')}{NC}")
+                return
         else:
-            smooth_print(f"{RED}Error al conectar con Gemini: {resp.get('error')}{NC}")
+            smooth_print(f"{GREEN}✓ Sesión conversacional previa reanudada.{NC}\n", 0.05)
+            last_model_msg = next((m['parts'][0]['text'] for m in reversed(conversation_history) if m['role'] == 'model'), None)
+            if last_model_msg:
+                render_markdown_smooth(last_model_msg)
+                print("")
+
+        # Bucle interactivo continuo (REPL) con memoria conversacional acumulada
+        while True:
+            user_input = input(f"{BOLD}{CYAN}👉 Vos (o 'salir'): {NC}").strip()
+            if not user_input or user_input.lower() in ["salir", "exit", "quit", "q"]:
+                smooth_print(f"{YELLOW}Sesión con el Lead-Architect finalizada.{NC}")
+                break
+
+            smooth_print(f"\n{CYAN}🧠 Lead-Architect analizando requerimiento...{NC}\n", 0.05)
+            conversation_history.append({"role": "user", "parts": [{"text": user_input}]})
+
+            resp_turn = chelo_gemini_client.generate_content(conversation_history, system_instruction=full_system)
+            if resp_turn.get("ok"):
+                reply_turn = resp_turn['text']
+                conversation_history.append({"role": "model", "parts": [{"text": reply_turn}]})
+                try:
+                    history_file.write_text(json.dumps(conversation_history, ensure_ascii=False, indent=2), encoding="utf-8")
+                except Exception:
+                    pass
+                print("")
+                render_markdown_smooth(reply_turn)
+                print("")
+            else:
+                smooth_print(f"{RED}Error: {resp_turn.get('error')}{NC}")
+                conversation_history.pop()
     else:
         agent_engine = find_agent_runner()
         if agent_engine:
