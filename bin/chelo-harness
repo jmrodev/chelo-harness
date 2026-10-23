@@ -930,9 +930,41 @@ def cmd_interactive_session():
         smooth_print(f"{YELLOW}⚡ MODO FULL-BATTERY / TEST ACTIVO:{NC} Desplegando toda la artillería arquitectónica completa (BDD + OpenAPI + Prism Mock + Hurl Tests + Front + Back).\n", 0.1)
 
     system_prompt = get_agent_prompt("lead-architect")
-    agent_engine = find_agent_runner()
 
-    if agent_engine:
+    # Si hay clave de Gemini disponible, usar el cerebro nativo directo (sin que ninguna CLI capture la terminal)
+    has_gemini_key = bool(os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"))
+
+    if has_gemini_key:
+        smooth_print(f"{GREEN}Iniciando diálogo con el Lead-Architect (Gemini Nativo Directo)...{NC}\n", 0.08)
+        import chelo_gemini_client
+
+        test_instruction = (
+            "\nATENCIÓN: Estamos en MODO TEST / FULL-BATTERY para poner a prueba el arnés al 100%.\n"
+            "Aunque la aplicación pedida por el usuario sea simple o trivial (ej: app de sorteo, contador, notas), "
+            "NO hagas una solución simple solo de front. Desplegá el circuito Spec-First COMPLETO: "
+            "1) User Story BDD en docs/stories/, 2) Contrato openapi.yaml con endpoints y schemas, "
+            "3) Tests .hurl con aserción sl-violations contra Mock, 4) Frontend consumiendo el Mock :4010, "
+            "5) Backend mínimo implementando la API real, 6) Quality Gate y commit con git-agent.\n"
+        ) if is_full_test else ""
+
+        full_system = f"{system_prompt}\n{test_instruction}"
+        initial_prompt = f"El desarrollador acaba de iniciar una sesión en el proyecto '{project}'. Saludalo con tono profesional y preguntale qué objetivo o feature técnica/negocio planea encarar hoy."
+
+        resp = chelo_gemini_client.generate_content(initial_prompt, system_instruction=full_system)
+        if resp.get("ok"):
+            smooth_print(f"\n{resp['text']}\n", 0.05)
+            user_input = input(f"{BOLD}👉 Vos: {NC}").strip()
+            if user_input:
+                smooth_print(f"\n{CYAN}🧠 Procesando requerimiento con arquitectura Spec-First...{NC}\n", 0.05)
+                turn2 = f"El usuario solicita: '{user_input}'. Planteá el plan de acción atómico (Historias BDD, Contrato OpenAPI y Tests Hurl) para arrancar."
+                resp2 = chelo_gemini_client.generate_content(turn2, system_instruction=full_system)
+                if resp2.get("ok"):
+                    smooth_print(f"{resp2['text']}\n", 0.05)
+        else:
+            smooth_print(f"{RED}Error al conectar con Gemini: {resp.get('error')}{NC}")
+    else:
+        agent_engine = find_agent_runner()
+        if agent_engine:
         engine_label = "Antigravity CLI (AGY)" if agent_engine == "agy" else "OpenCode"
         smooth_print(f"{GREEN}Iniciando sesión viva con el Lead-Architect ({engine_label})...{NC}\n", 0.1)
         test_instruction = (
