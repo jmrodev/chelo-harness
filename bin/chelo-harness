@@ -401,6 +401,12 @@ jsonpath "$.status" == "ok"
         with open(readme_docs, "w", encoding="utf-8") as f:
             f.write(f"# Arquitectura del Proyecto {cwd.name}\n\nDocumentación viva de contratos y diagramas Mermaid.\n")
 
+    # 7. Reglas para GGA / Coding Agents
+    agents_rules = cwd / "AGENTS.md"
+    if not agents_rules.exists():
+        with open(agents_rules, "w", encoding="utf-8") as f:
+            f.write("# Reglas de Gobernanza del Proyecto\n- Spec-First estricto: Todo cambio de endpoint requiere actualizar openapi.yaml primero.\n- Máximo 10 archivos modificados por ticket.\n- Tests Hurl obligatorios.\n")
+
     print(f"\n{GREEN}{BOLD}🎉 ¡Proyecto inicializado con éxito!{NC}")
     print(f"{CYAN}Para probar el ciclo en 10 segundos:{NC}")
     print(f"  1. {YELLOW}chelo-harness mock &{NC}  (Levanta el servidor simulado en :4010)")
@@ -647,7 +653,7 @@ def cmd_mock():
         print(f"{BLUE}🚀 Levantando Prism Mock Server desde:{NC} {spec}")
         print(f"{GREEN}✓ Servidor simulado activo en:{NC} {BOLD}http://localhost:{PRISM_PORT}{NC}")
         print(f"{YELLOW}Presioná Ctrl+C para detener el mock.{NC}\n")
-        cmd = runner + ["mock", str(spec), "-p", str(PRISM_PORT), "-m"]
+        cmd = runner + ["mock", str(spec), "-p", str(PRISM_PORT)]
         subprocess.run(cmd)
     else:
         run_native_python_mock(spec, PRISM_PORT)
@@ -724,7 +730,13 @@ def cmd_test():
         if hurl_bin:
             res = subprocess.run([hurl_bin, "--test", str(hf)], capture_output=True, text=True)
             passed = (res.returncode == 0)
-            err = res.stderr.strip()[:300] if res.stderr else ""
+            raw_err = (res.stderr or "").strip()
+            # Filtrar warnings de versionado de bibliotecas compartidas (ej. libxml2)
+            filtered_lines = [
+                line for line in raw_err.splitlines()
+                if "no version information available" not in line
+            ]
+            err = "\n".join(filtered_lines).strip()[:300]
         else:
             passed = run_native_python_test(hf)
             err = "El status code no coincidió con el esperado."
@@ -944,7 +956,7 @@ def cmd_gate():
 
     if shutil.which("gga"):
         print(f"\n{BLUE}▶ Ejecutando auditoría de riesgos con GGA...{NC}")
-        gga_res = subprocess.run(["gga", "review", "--staged"], capture_output=True, text=True)
+        gga_res = subprocess.run(["gga", "run"], capture_output=True, text=True)
         if gga_res.returncode == 0:
             print(f"{GREEN}✓ Auditoría GGA aprobada sin riesgos críticos.{NC}")
         else:
