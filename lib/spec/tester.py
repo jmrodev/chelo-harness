@@ -3,6 +3,7 @@
 Módulo de ejecución de pruebas de contrato Hurl contra Prism Mock o Backend real.
 """
 
+import os
 import sys
 import time
 import socket
