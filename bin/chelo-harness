@@ -944,13 +944,37 @@ def cmd_interactive_session():
         )
         try:
             if agent_engine == "agy":
-                # En agy pasamos el prompt interactivo directo
                 subprocess.run(["agy", "--prompt-interactive", intro])
             else:
                 subprocess.run(["opencode", "run", intro])
         except KeyboardInterrupt:
             pass
         audit_changes_rule()
+
+        # Si el usuario eligió Dashboard TUI (4), ejecutar el monitor multi-panel de hitos
+        if view_mode == "dashboard" and ui_dashboard:
+            try:
+                steps = [
+                    ("Requerimientos BDD", "DONE"),
+                    ("Contrato OpenAPI", "DONE"),
+                    ("Prism Mock :4010", "IN_PROGRESS"),
+                    ("Tests Hurl", "PENDING"),
+                    ("Implementación", "PENDING")
+                ]
+                logs_dict = {
+                    "agent": [
+                        "> Lead-Architect finalizó la entrevista.",
+                        "> Contrato y requerimientos inicializados.",
+                        "> Esperando ejecución de agentes confinados..."
+                    ],
+                    "qa": [
+                        "> Mock Server listo en http://localhost:4010",
+                        "> Pruebas Hurl a la espera de ejecución"
+                    ]
+                }
+                ui_dashboard.run_curses_dashboard(project, steps, logs_dict)
+            except Exception:
+                pass
     else:
         smooth_print(f"{YELLOW}Motor de agente (AGY/OpenCode) no detectado.{NC}", 0.05)
         if shutil.which("wl-copy") and system_prompt:
@@ -1069,7 +1093,10 @@ def cmd_agent(role):
                         f"Preservá el confinamiento (máximo 10 archivos)."
                     )
                     print(f"\n{YELLOW}🔄 Test fallido detectado. Inyectando feedback de error al agente para auto-corrección...{NC}\n")
-                    subprocess.run([runner_opencode, "run", feedback_prompt])
+                    if agent_engine == "agy":
+                        subprocess.run(["agy", "--print", feedback_prompt])
+                    else:
+                        subprocess.run([runner_opencode, "run", feedback_prompt])
                     audit_changes_rule()
     else:
         if shutil.which("wl-copy"):
