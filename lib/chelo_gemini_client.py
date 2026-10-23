@@ -10,14 +10,20 @@ import json
 import urllib.request
 import urllib.error
 
-def generate_content(prompt, system_instruction=None, model="gemini-2.5-flash"):
+def generate_content(prompt_or_contents, system_instruction=None, model="gemini-2.5-flash"):
     api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     if not api_key:
         return {"ok": False, "error": "Falta configurar GEMINI_API_KEY (ejecutá 'chelo-harness setup')"}
 
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
     
-    contents = [{"role": "user", "parts": [{"text": prompt}]}]
+    if isinstance(prompt_or_contents, str):
+        contents = [{"role": "user", "parts": [{"text": prompt_or_contents}]}]
+    elif isinstance(prompt_or_contents, list):
+        contents = prompt_or_contents
+    else:
+        return {"ok": False, "error": "Formato de prompt inválido"}
+
     payload = {"contents": contents}
     
     if system_instruction:

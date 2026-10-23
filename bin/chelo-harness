@@ -980,13 +980,19 @@ def cmd_interactive_session():
         full_system = f"{system_prompt}\n{test_instruction}"
         initial_prompt = f"El desarrollador acaba de iniciar una sesión en el proyecto '{project}'. Saludalo con tono profesional y preguntale qué objetivo o feature técnica/negocio planea encarar hoy."
 
-        resp = chelo_gemini_client.generate_content(initial_prompt, system_instruction=full_system)
+        conversation_history = [
+            {"role": "user", "parts": [{"text": initial_prompt}]}
+        ]
+
+        resp = chelo_gemini_client.generate_content(conversation_history, system_instruction=full_system)
         if resp.get("ok"):
+            model_reply = resp['text']
+            conversation_history.append({"role": "model", "parts": [{"text": model_reply}]})
             print("")
-            render_markdown_smooth(resp['text'])
+            render_markdown_smooth(model_reply)
             print("")
             
-            # Bucle interactivo continuo (REPL) para que no se salga
+            # Bucle interactivo continuo (REPL) con memoria conversacional acumulada
             while True:
                 user_input = input(f"{BOLD}{CYAN}👉 Vos (o 'salir'): {NC}").strip()
                 if not user_input or user_input.lower() in ["salir", "exit", "quit", "q"]:
@@ -994,14 +1000,19 @@ def cmd_interactive_session():
                     break
 
                 smooth_print(f"\n{CYAN}🧠 Lead-Architect analizando requerimiento...{NC}\n", 0.05)
-                turn = f"El usuario responde: '{user_input}'. Continuá guiando el flujo (crear historias, contratos o ejecutar tests)."
-                resp_turn = chelo_gemini_client.generate_content(turn, system_instruction=full_system)
+                conversation_history.append({"role": "user", "parts": [{"text": user_input}]})
+
+                resp_turn = chelo_gemini_client.generate_content(conversation_history, system_instruction=full_system)
                 if resp_turn.get("ok"):
+                    reply_turn = resp_turn['text']
+                    conversation_history.append({"role": "model", "parts": [{"text": reply_turn}]})
                     print("")
-                    render_markdown_smooth(resp_turn['text'])
+                    render_markdown_smooth(reply_turn)
                     print("")
                 else:
                     smooth_print(f"{RED}Error: {resp_turn.get('error')}{NC}")
+                    # Si falló la llamada, removemos el último mensaje del usuario para no corromper la alternancia de roles
+                    conversation_history.pop()
         else:
             smooth_print(f"{RED}Error al conectar con Gemini: {resp.get('error')}{NC}")
     else:
