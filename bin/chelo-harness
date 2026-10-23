@@ -1033,12 +1033,20 @@ def cmd_interactive_session():
                 render_markdown_smooth(reply_turn)
                 print("")
 
-                # DETECCIÓN DE EJECUCIÓN: Si el Lead-Architect dice que dispara los agentes o el usuario confirmó ("si", "dale", "ok", "ejecutar")
-                user_agreed = user_input.lower() in ["si", "sí", "dale", "adelante", "ok", "arranca", "arrancá", "procede", "procedé", "ejecuta", "ejecutar"]
-                architect_trigger = any(kw in reply_turn.lower() for kw in ["ejecución de agentes", "se están disparando los siguientes agentes", "iniciando el primer ciclo"])
+                # DETECCIÓN DE EJECUCIÓN ROBUSTA:
+                user_agreed = user_input.lower().strip() in ["si", "sí", "dale", "adelante", "ok", "arranca", "arrancá", "procede", "procedé", "ejecuta", "ejecutar"]
+                
+                # Gatillo si el arquitecto emitió la señal [DISPARAR AGENTES] o si habla de ejecución/trabajo en progreso
+                architect_keywords = [
+                    "[disparar agentes]", "ejecución de agentes", "se están disparando",
+                    "iniciando el primer ciclo", "el proceso está en marcha", "continúan trabajando",
+                    "están activamente trabajando", "continúan su labor"
+                ]
+                architect_trigger = any(kw in reply_turn.lower() for kw in architect_keywords)
 
-                if user_agreed and architect_trigger:
-                    smooth_print(f"\n{BOLD}{BLUE}⚙️  MATERIALIZANDO ARTEFACTOS SPEC-FIRST (Story + OpenAPI + Hurl)...{NC}\n", 0.05)
+                if user_agreed or "[disparar agentes]" in reply_turn.lower():
+                    # Solo materializar si no se materializó ya en este mismo ticket o si hay disparador
+                    smooth_print(f"\n{BOLD}{BLUE}⚙️  ORQUESTADOR EN ACCIÓN: Materializando artefactos físicos con Story, Spec y QA...{NC}\n", 0.05)
                     
                     history_text = "\n".join([f"{m['role'].upper()}: {m['parts'][0]['text']}" for m in conversation_history[-4:]])
                     artifact_prompt = (

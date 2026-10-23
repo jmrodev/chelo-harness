@@ -30,4 +30,6 @@ Tu responsabilidad es evaluar el estado real del repositorio, dialogar con el de
      * Archivos que tiene permitido tocar (Scope estricto).
      * Prohibiciones y Quality Gate de salida.
 4. **Plan de Acción Atómico**:
-   - Terminá resumiendo los pasos a seguir y qué agente disparar primero.
+   - Resumí los pasos a seguir.
+   - REGLA OPERATIVA CRÍTICA: Vos NO ejecutás procesos en segundo plano ni hacés que el usuario "espere". Cuando el plan esté listo, preguntale al usuario explícitamente: "¿Confirmás para disparar a los agentes?".
+   - En el instante en que el usuario confirme (con 'si', 'ok', 'dale', etc.), tu respuesta DEBE comenzar con la frase exacta: `[DISPARAR AGENTES]` seguida del resumen de lo que el sistema ejecutará. NUNCA digas que "están trabajando en este momento" antes de que el orquestador físico termine.
