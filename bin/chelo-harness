@@ -85,16 +85,16 @@ MAX_ALLOWED_CHANGES = 10
 PRISM_PORT = 4010
 BACKEND_PORT = 8000
 
-def smooth_print(text="", delay=0.03):
-    """Imprime texto de forma suave y legible para lectura humana."""
+def smooth_print(text="", delay=0.15):
+    """Imprime texto con cadencia humana pausada y natural."""
     print(text, flush=True)
     if delay > 0:
         time.sleep(delay)
 
 def banner():
-    smooth_print(f"{CYAN}{BOLD}╔═══════════════════════════════════════════════════════════════════╗{NC}", 0.02)
-    smooth_print(f"{CYAN}{BOLD}║         🛡️  CHELO-HARNESS — AGILE & CONTRACT RUNTIME               ║{NC}", 0.02)
-    smooth_print(f"{CYAN}{BOLD}╚═══════════════════════════════════════════════════════════════════╝{NC}\n", 0.05)
+    smooth_print(f"{CYAN}{BOLD}╔═══════════════════════════════════════════════════════════════════╗{NC}", 0.08)
+    smooth_print(f"{CYAN}{BOLD}║         🛡️  CHELO-HARNESS — AGILE & CONTRACT RUNTIME               ║{NC}", 0.08)
+    smooth_print(f"{CYAN}{BOLD}╚═══════════════════════════════════════════════════════════════════╝{NC}\n", 0.15)
 
 def check_git_repo():
     res = subprocess.run(["git", "rev-parse", "--is-inside-work-tree"], capture_output=True)
@@ -337,22 +337,22 @@ def cmd_init():
 
     # 1. Git init si no existe
     if not (cwd / ".git").exists():
-        subprocess.run(["git", "init"], check=True)
-        print(f"  {GREEN}✓ Repositorio Git inicializado.{NC}")
+        subprocess.run(["git", "init"], check=True, stdout=subprocess.DEVNULL)
+        smooth_print(f"  {GREEN}✓ Repositorio Git inicializado.{NC}", 0.1)
 
     # 2. Estructura de carpetas
     docs_dir = cwd / "docs"
     tests_dir = cwd / "tests"
     docs_dir.mkdir(exist_ok=True)
     tests_dir.mkdir(exist_ok=True)
-    print(f"  {GREEN}✓ Carpetas creadas:{NC} docs/ (Docs-as-Code) y tests/ (Pruebas Hurl)")
+    smooth_print(f"  {GREEN}✓ Carpetas creadas:{NC} docs/ (Docs-as-Code) y tests/ (Pruebas Hurl)", 0.1)
 
     # 3. .gitignore
     gitignore = cwd / ".gitignore"
     if not gitignore.exists():
         with open(gitignore, "w", encoding="utf-8") as f:
             f.write("# Secrets & Envs\n.env\n.env.*\n!.env.example\n\n# Dependencies\nnode_modules/\nvendor/\n.venv/\n__pycache__/\n\n# Media\n*.mp4\n*.m4a\n*.mp3\n")
-        print(f"  {GREEN}✓ Archivo .gitignore creado con reglas de seguridad.{NC}")
+        smooth_print(f"  {GREEN}✓ Archivo .gitignore creado con reglas de seguridad.{NC}", 0.1)
 
     # 4. openapi.yaml inicial
     openapi_file = cwd / "openapi.yaml"
@@ -387,7 +387,7 @@ paths:
 """
         with open(openapi_file, "w", encoding="utf-8") as f:
             f.write(content)
-        print(f"  {GREEN}✓ Contrato base openapi.yaml creado con endpoint /health.{NC}")
+        smooth_print(f"  {GREEN}✓ Contrato base openapi.yaml creado con endpoint /health.{NC}", 0.1)
 
     # 5. Primer test Hurl
     hurl_file = tests_dir / "000_health.hurl"
@@ -402,7 +402,7 @@ jsonpath "$.status" == "ok"
 """
         with open(hurl_file, "w", encoding="utf-8") as f:
             f.write(hurl_content)
-        print(f"  {GREEN}✓ Primer test de contrato creado:{NC} tests/000_health.hurl")
+        smooth_print(f"  {GREEN}✓ Primer test de contrato creado:{NC} tests/000_health.hurl", 0.1)
 
     # 6. Docs inicial y directorio de stories
     stories_dir = docs_dir / "stories"
@@ -433,7 +433,7 @@ jsonpath "$.status" == "ok"
 """
         with open(agents_file, "w", encoding="utf-8") as f:
             f.write(agents_content)
-        print(f"  {GREEN}✓ Constitución de gobernanza creada:{NC} AGENTS.md")
+        smooth_print(f"  {GREEN}✓ Constitución de gobernanza creada:{NC} AGENTS.md", 0.1)
 
     # 8. GitHub Actions CI Workflow oficial para el proyecto
     workflows_dir = cwd / ".github" / "workflows"
@@ -513,13 +513,12 @@ jobs:
 """
         with open(ci_file, "w", encoding="utf-8") as f:
             f.write(ci_content)
-        print(f"  {GREEN}✓ Pipeline GitHub Actions inyectado:{NC} .github/workflows/quality-gate.yml")
+        smooth_print(f"  {GREEN}✓ Pipeline GitHub Actions inyectado:{NC} .github/workflows/quality-gate.yml", 0.1)
 
-    print(f"\n{GREEN}{BOLD}🎉 ¡Proyecto inicializado con éxito!{NC}")
-    print(f"{CYAN}Para probar el ciclo en 10 segundos:{NC}")
-    print(f"  1. {YELLOW}chelo-harness mock &{NC}  (Levanta el servidor simulado en :4010)")
-    print(f"  2. {YELLOW}chelo-harness test{NC}    (Ejecuta tests/000_health.hurl)")
-    print("")
+    smooth_print(f"\n{GREEN}{BOLD}🎉 ¡Proyecto inicializado con éxito!{NC}", 0.15)
+    smooth_print(f"{CYAN}Para probar el ciclo en 10 segundos:{NC}", 0.1)
+    smooth_print(f"  1. {YELLOW}chelo-harness mock &{NC}  (Levanta el servidor simulado en :4010)", 0.08)
+    smooth_print(f"  2. {YELLOW}chelo-harness test{NC}    (Ejecuta tests/000_health.hurl)\n", 0.15)
 
 def find_opencode_runner():
     """Detecta opencode en PATH, ~/.opencode/bin o ~/.local/bin."""
@@ -602,29 +601,29 @@ def cmd_doctor(auto_fix=False):
 
 def cmd_daily_sync():
     banner()
-    print(f"{BLUE}☕ SINCRONIZACIÓN DAILY SCRUM & CANALES DEL EQUIPO{NC}\n")
+    smooth_print(f"{BLUE}☕ SINCRONIZACIÓN DAILY SCRUM & CANALES DEL EQUIPO{NC}\n", 0.1)
 
     slack_status = os.environ.get("SLACK_BOT_TOKEN")
     if slack_status == "DISABLED":
-        print(f"  {YELLOW}○ Slack marcado como no utilizado.{NC}")
+        smooth_print(f"  {YELLOW}○ Slack marcado como no utilizado.{NC}", 0.05)
     else:
-        print(f"{CYAN}📡 Consultando canal de equipo de Slack...{NC}")
+        smooth_print(f"{CYAN}📡 Consultando canal de equipo de Slack...{NC}", 0.1)
         res = chelo_channels.get_slack_messages(limit=3)
         if res.get("ok"):
             for m in res.get("messages", []):
-                print(f"   💬 {YELLOW}{m.get('user')}{NC}: {m.get('text')[:120]}...")
+                smooth_print(f"   💬 {YELLOW}{m.get('user')}{NC}: {m.get('text')[:120]}...", 0.12)
         else:
-            print(f"   {YELLOW}⚠️  Slack no disponible o sin token: {res.get('error')}{NC}")
+            smooth_print(f"   {YELLOW}⚠️  Slack no disponible o sin token: {res.get('error')}{NC}", 0.05)
 
-    print(f"\n{CYAN}📌 Consultando Sprint y Milestones de GitHub...{NC}")
+    smooth_print(f"\n{CYAN}📌 Consultando Sprint y Milestones de GitHub...{NC}", 0.1)
     if shutil.which("gh"):
         sprint_info = chelo_channels.get_github_sprint_context()
         m = sprint_info.get("milestone")
         if m:
-            print(f"   🏆 {GREEN}Milestone Activo:{NC} {BOLD}{m.get('title')}{NC} (Vence: {m.get('due_on', 'N/A')})")
-            print(f"      Progreso: {m.get('closed_issues')} cerrados / {m.get('open_issues')} abiertos")
+            smooth_print(f"   🏆 {GREEN}Milestone Activo:{NC} {BOLD}{m.get('title')}{NC} (Vence: {m.get('due_on', 'N/A')})", 0.1)
+            smooth_print(f"      Progreso: {m.get('closed_issues')} cerrados / {m.get('open_issues')} abiertos", 0.08)
         else:
-            print(f"   {YELLOW}No hay Milestones abiertos en este repositorio.{NC}")
+            smooth_print(f"   {YELLOW}No hay Milestones abiertos en este repositorio.{NC}", 0.1)
     print("")
 
 def cmd_board(action="open"):
