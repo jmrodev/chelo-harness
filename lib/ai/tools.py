@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 Módulo de herramientas de ejecución real para los agentes de Chelo-Harness.
+Incluye las funciones y sus esquemas JSON para Function Calling de Gemini.
 """
 
 import subprocess
@@ -52,3 +53,54 @@ AVAILABLE_TOOLS = {
     "list_dir": tool_list_dir,
     "run_command": tool_run_command
 }
+
+TOOL_DECLARATIONS = [
+    {
+        "functionDeclarations": [
+            {
+                "name": "read_file",
+                "description": "Lee el contenido completo de un archivo en el workspace.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "path": {"type": "STRING", "description": "Ruta relativa del archivo a leer."}
+                    },
+                    "required": ["path"]
+                }
+            },
+            {
+                "name": "write_file",
+                "description": "Crea o sobrescribe un archivo en el workspace.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "path": {"type": "STRING", "description": "Ruta relativa del archivo a escribir."},
+                        "content": {"type": "STRING", "description": "Contenido completo del archivo."}
+                    },
+                    "required": ["path", "content"]
+                }
+            },
+            {
+                "name": "list_dir",
+                "description": "Lista los archivos y carpetas dentro de un directorio relativo.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "path": {"type": "STRING", "description": "Directorio a listar (default '.')."}
+                    }
+                }
+            },
+            {
+                "name": "run_command",
+                "description": "Ejecuta un comando bash en el workspace (útil para tests o validaciones).",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "cmd": {"type": "STRING", "description": "Comando de shell a ejecutar."}
+                    },
+                    "required": ["cmd"]
+                }
+            }
+        ]
+    }
+]
