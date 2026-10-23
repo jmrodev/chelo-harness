@@ -864,23 +864,28 @@ def cmd_test():
     return passed
 
 def select_view_mode():
-    """Permite al desarrollador elegir de forma agnóstica cómo visualizar a los agentes."""
+    """Permite al desarrollador elegir de forma agnóstica cómo visualizar y controlar el workflow."""
     if "--zen" in sys.argv or "-q" in sys.argv:
         return "zen"
-    if "--verbose" in sys.argv or "-v" in sys.argv:
-        return "verbose"
+    if "--chusma" in sys.argv or "--verbose" in sys.argv or "-v" in sys.argv:
+        return "chusma"
+    if "--control" in sys.argv or "--diff" in sys.argv or "-c" in sys.argv:
+        return "control"
     if "--dashboard" in sys.argv or "-d" in sys.argv:
         return "dashboard"
 
-    print(f"{BOLD}{CYAN}¿Cómo querés visualizar la ejecución de los agentes en esta sesión?{NC}")
-    print(f"  [1] 🧘 {BOLD}Modo Zen (Silencioso){NC}: Barra de progreso limpia sin saturar la terminal.")
-    print(f"  [2] 📜 {BOLD}Modo Verbose (Streaming){NC}: Visualización en vivo de cada línea que escribe el agente.")
-    print(f"  [3] 🎛️  {BOLD}Modo Dashboard TUI{NC}: Multi-panel dividido en cajas ANSI/Curses agnósticas.")
+    print(f"{BOLD}{CYAN}¿Qué nivel de visibilidad y control querés sobre el workflow?{NC}")
+    print(f"  [1] 🧘 {BOLD}Modo Zen (Piloto Automático){NC}: Cero ruido. Que suceda todo y avise al final.")
+    print(f"  [2] 👀 {BOLD}Modo Chusma (Streaming en Vivo){NC}: Ver en tiempo real qué piensa y escribe cada agente.")
+    print(f"  [3] 🔍 {BOLD}Modo Control Total (Diff & Approval){NC}: Pausa en cada cambio, muestra git diff y pide tu OK.")
+    print(f"  [4] 🎛️  {BOLD}Modo Dashboard TUI (Multi-panel ANSI){NC}: Monitor visual en cajas Curses en tu terminal.")
     
-    choice = input(f"\n{BOLD}Seleccioná [1-3] (Default: 1): {NC}").strip()
+    choice = input(f"\n{BOLD}Seleccioná [1-4] (Default: 1): {NC}").strip()
     if choice == "2":
-        return "verbose"
+        return "chusma"
     elif choice == "3":
+        return "control"
+    elif choice == "4":
         return "dashboard"
     return "zen"
 
@@ -992,6 +997,17 @@ def cmd_agent(role):
 
         # Feedback Loop para roles de implementación / QA
         if role in ["back", "qa", "front"]:
+            if "--control" in sys.argv or "-c" in sys.argv:
+                print(f"\n{BOLD}{CYAN}🔍 [MODO CONTROL TOTAL] Revisión de cambios antes de verificar contrato:{NC}")
+                subprocess.run(["git", "diff", "--stat"])
+                sub_choice = input(f"\n¿Querés ver el diff completo? [s/N]: ").strip().lower()
+                if sub_choice == "s":
+                    subprocess.run(["git", "diff"])
+                aprob = input(f"{BOLD}¿Aprobás continuar a la fase de pruebas? [S/n]: {NC}").strip().lower()
+                if aprob == "n":
+                    print(f"{YELLOW}Ejecución pausada por el usuario.{NC}")
+                    sys.exit(0)
+
             max_retries = 3
             for attempt in range(1, max_retries + 1):
                 print(f"\n{BLUE}▶ Verificando cumplimiento de contrato (Intento {attempt}/{max_retries})...{NC}")
