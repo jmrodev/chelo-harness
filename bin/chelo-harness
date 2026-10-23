@@ -520,6 +520,14 @@ jobs:
     smooth_print(f"  1. {YELLOW}chelo-harness mock &{NC}  (Levanta el servidor simulado en :4010)", 0.08)
     smooth_print(f"  2. {YELLOW}chelo-harness test{NC}    (Ejecuta tests/000_health.hurl)\n", 0.15)
 
+def find_agent_runner():
+    """Detecta el motor de IA preferido: Antigravity CLI (AGY) o fallback a OpenCode."""
+    if shutil.which("agy") or (Path.home() / ".local/bin/agy").is_file():
+        return "agy"
+    if shutil.which("opencode") or (Path.home() / ".local/bin/opencode").is_file():
+        return "opencode"
+    return None
+
 def find_opencode_runner():
     """Detecta opencode en PATH, ~/.opencode/bin o ~/.local/bin."""
     if shutil.which("opencode"):
@@ -915,10 +923,11 @@ def cmd_interactive_session():
         smooth_print(f"{YELLOW}⚡ MODO FULL-BATTERY / TEST ACTIVO:{NC} Desplegando toda la artillería arquitectónica completa (BDD + OpenAPI + Prism Mock + Hurl Tests + Front + Back).\n", 0.1)
 
     system_prompt = get_agent_prompt("lead-architect")
-    runner_opencode = find_opencode_runner()
+    agent_engine = find_agent_runner()
 
-    if runner_opencode:
-        smooth_print(f"{GREEN}Iniciando sesión viva con el Lead-Architect (OpenCode)...{NC}\n", 0.1)
+    if agent_engine:
+        engine_label = "Antigravity CLI (AGY)" if agent_engine == "agy" else "OpenCode"
+        smooth_print(f"{GREEN}Iniciando sesión viva con el Lead-Architect ({engine_label})...{NC}\n", 0.1)
         test_instruction = (
             "\nATENCIÓN: Estamos en MODO TEST / FULL-BATTERY para poner a prueba el arnés al 100%.\n"
             "Aunque la aplicación pedida por el usuario sea simple o trivial (ej: app de sorteo, contador, notas), "
@@ -934,12 +943,16 @@ def cmd_interactive_session():
             f"Saludalo con tono profesional y preguntale qué objetivo o feature técnica/negocio planea encarar hoy."
         )
         try:
-            subprocess.run([runner_opencode, "run", intro])
+            if agent_engine == "agy":
+                # En agy pasamos el prompt interactivo directo
+                subprocess.run(["agy", "--prompt-interactive", intro])
+            else:
+                subprocess.run(["opencode", "run", intro])
         except KeyboardInterrupt:
             pass
         audit_changes_rule()
     else:
-        smooth_print(f"{YELLOW}OpenCode no está presente para abrir el diálogo directo en terminal.{NC}", 0.05)
+        smooth_print(f"{YELLOW}Motor de agente (AGY/OpenCode) no detectado.{NC}", 0.05)
         if shutil.which("wl-copy") and system_prompt:
             subprocess.run(f"printf '%s' \"{system_prompt}\" | wl-copy", shell=True)
             smooth_print(f"{GREEN}✓ Prompt del Lead-Architect copiado al portapapeles.{NC} Pegalo en tu chat de AGY o Claude.", 0.05)
@@ -1011,11 +1024,15 @@ def cmd_agent(role):
         sys.exit(1)
 
     print(f"{BLUE}🚀 AGENTE CONFINADO:{NC} {BOLD}{agent_id.upper()}{NC}\n")
-    runner_opencode = find_opencode_runner()
+    agent_engine = find_agent_runner()
 
-    if runner_opencode:
-        print(f"{GREEN}Ejecutando con OpenCode confinado en sus reglas...{NC}")
-        subprocess.run([runner_opencode, "run", prompt_content])
+    if agent_engine:
+        engine_label = "Antigravity CLI (AGY)" if agent_engine == "agy" else "OpenCode"
+        print(f"{GREEN}Ejecutando con {engine_label} confinado en sus reglas...{NC}")
+        if agent_engine == "agy":
+            subprocess.run(["agy", "--print", prompt_content])
+        else:
+            subprocess.run(["opencode", "run", prompt_content])
         audit_changes_rule()
 
         # Feedback Loop para roles de implementación / QA
