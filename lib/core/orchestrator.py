@@ -128,17 +128,20 @@ def run_pipeline(project_name: str, requirement: str, trace: bool = False):
         is_hurl_syntax_error = any(
             kw in err_report for kw in ["Parsing predicate", "expecting a predicate", "Parsing error", "Invalid"]
         )
-        is_contract_violation = "sl-violations" in err_report or "Assert failure" in err_report
+        is_contract_violation = "sl-violations" in err_report
+        is_bad_assertion = any(
+            kw in err_report for kw in ["Assert status code", "Assert failure", "actual value is", "actual:"]
+        )
 
-        if is_hurl_syntax_error:
-            smooth_print(f"\n{YELLOW}🔄 Error de sintaxis Hurl detectado — enviando al QA-Tester para corrección...{NC}\n", 0.05)
-            log_trace(f"Tipo de falla: SINTAXIS HURL. Agente corrector: qa-tester", trace)
+        if is_hurl_syntax_error or is_bad_assertion:
+            smooth_print(f"\n{YELLOW}🔄 Aserciones/sintaxis incorrectas — enviando al QA-Tester para corrección...{NC}\n", 0.05)
+            log_trace(f"Tipo de falla: {'SINTAXIS HURL' if is_hurl_syntax_error else 'ASERCIÓN INCORRECTA'}. Agente: qa-tester", trace)
             fix_resp = run_agent_turn(
                 "qa-tester",
-                f"El archivo Hurl generado tiene errores de SINTAXIS que hurl no puede parsear:\n{err_report}\n\n"
-                f"Reescribí los tests Hurl completos usando ÚNICAMENTE sintaxis válida de Hurl. "
-                f"NUNCA uses 'is defined' — el predicado correcto es 'exists'. "
-                f"Recordá: cada bloque empieza con METHOD url, luego HTTP <status>, luego [Asserts].",
+                f"Los tests Hurl fallaron con este reporte:\n{err_report}\n\n"
+                f"Reescribí TODOS los tests corrigiendo status codes y valores esperados para que coincidan "
+                f"exactamente con los examples del openapi.yaml. "
+                f"Usá solo sintaxis Hurl válida: exists, ==, isInteger. NUNCA 'is defined'.",
                 context=f"Contrato OpenAPI actual:\n{spec_content}",
                 trace=trace
             )
