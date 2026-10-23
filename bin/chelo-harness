@@ -85,6 +85,20 @@ MAX_ALLOWED_CHANGES = 10
 PRISM_PORT = 4010
 BACKEND_PORT = 8000
 
+def stream_typewriter(text, char_delay=0.002, line_delay=0.05):
+    """Escribe el texto carácter por carácter simulando streaming vivo para no escupir un bloque entero."""
+    for line in text.splitlines():
+        for char in line:
+            sys.stdout.write(char)
+            sys.stdout.flush()
+            if char in [".", ":", "\n"]:
+                time.sleep(0.015)
+            else:
+                time.sleep(char_delay)
+        sys.stdout.write("\n")
+        sys.stdout.flush()
+        time.sleep(line_delay)
+
 def smooth_print(text="", delay=0.15):
     """Imprime texto con cadencia humana pausada y natural."""
     print(text, flush=True)
@@ -952,7 +966,9 @@ def cmd_interactive_session():
 
         resp = chelo_gemini_client.generate_content(initial_prompt, system_instruction=full_system)
         if resp.get("ok"):
-            smooth_print(f"\n{resp['text']}\n", 0.05)
+            print("")
+            stream_typewriter(resp['text'])
+            print("")
             
             # Bucle interactivo continuo (REPL) para que no se salga
             while True:
@@ -965,7 +981,9 @@ def cmd_interactive_session():
                 turn = f"El usuario responde: '{user_input}'. Continuá guiando el flujo (crear historias, contratos o ejecutar tests)."
                 resp_turn = chelo_gemini_client.generate_content(turn, system_instruction=full_system)
                 if resp_turn.get("ok"):
-                    smooth_print(f"{resp_turn['text']}\n", 0.03)
+                    print("")
+                    stream_typewriter(resp_turn['text'])
+                    print("")
                 else:
                     smooth_print(f"{RED}Error: {resp_turn.get('error')}{NC}")
         else:
