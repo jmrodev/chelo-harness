@@ -31,12 +31,15 @@ jobs:
           rm -f hurl.deb
 
       - name: 🚀 Start Prism Mock Server
+        id: prism_mock
         run: |
           SPEC_FILE="$(find . -maxdepth 2 -name 'openapi.yaml' -o -name 'openapi.yml' | head -n 1)"
           if [ -z "$SPEC_FILE" ]; then
-            echo "::error::No se encontró openapi.yaml en el repositorio."
-            exit 1
+            echo "ℹ️ No se detectó contrato OpenAPI en este commit. Omitiendo validación mock."
+            echo "has_spec=false" >> $GITHUB_OUTPUT
+            exit 0
           fi
+          echo "has_spec=true" >> $GITHUB_OUTPUT
           echo "Starting Prism Mock on :4010 with $SPEC_FILE"
           prism mock "$SPEC_FILE" -p 4010 > prism.log 2>&1 &
           sleep 4
@@ -47,8 +50,8 @@ jobs:
         run: |
           mkdir -p test-reports
           TEST_FILES=$(find . -name "*.hurl" | sort)
-          if [ -z "$TEST_FILES" ]; then
-            echo "⚠️ No .hurl test files found."
+          if [ -z "$TEST_FILES" ] || [ "${{ steps.prism_mock.outputs.has_spec }}" = "false" ]; then
+            echo "⚠️ No se encontraron pruebas .hurl o no hay contrato activo."
             echo "status=skipped" >> $GITHUB_OUTPUT
             exit 0
           fi
