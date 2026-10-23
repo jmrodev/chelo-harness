@@ -16,9 +16,27 @@ BASE_URL="https://raw.githubusercontent.com/jmrodev/chelo-harness/main"
 curl -fsSL "$BASE_URL/bin/chelo-harness" -o "$BIN_DIR/chelo-harness"
 chmod +x "$BIN_DIR/chelo-harness"
 
-# Descargar librería de canales y ui dashboard
-curl -fsSL "$BASE_URL/lib/chelo_channels.py" -o "$LIB_DIR/chelo_channels.py"
-curl -fsSL "$BASE_URL/lib/ui_dashboard.py" -o "$LIB_DIR/ui_dashboard.py"
+# Descargar módulos de la librería chelo
+for mod in chelo_channels.py ui_dashboard.py chelo_mcp.py; do
+  curl -fsSL "$BASE_URL/lib/$mod" -o "$LIB_DIR/$mod" 2>/dev/null || true
+done
+
+# Descargar paquetes modulares (core, spec, ai, ui)
+mkdir -p "$LIB_DIR/core" "$LIB_DIR/spec" "$LIB_DIR/ai" "$LIB_DIR/ui"
+touch "$LIB_DIR/__init__.py" "$LIB_DIR/core/__init__.py" "$LIB_DIR/spec/__init__.py" "$LIB_DIR/ai/__init__.py" "$LIB_DIR/ui/__init__.py"
+
+for f in gate.py init_project.py orchestrator.py runner.py setup.py; do
+  curl -fsSL "$BASE_URL/lib/core/$f" -o "$LIB_DIR/core/$f" 2>/dev/null || true
+done
+for f in mock_engine.py tester.py; do
+  curl -fsSL "$BASE_URL/lib/spec/$f" -o "$LIB_DIR/spec/$f" 2>/dev/null || true
+done
+for f in gemini_client.py tools.py; do
+  curl -fsSL "$BASE_URL/lib/ai/$f" -o "$LIB_DIR/ai/$f" 2>/dev/null || true
+done
+for f in console.py; do
+  curl -fsSL "$BASE_URL/lib/ui/$f" -o "$LIB_DIR/ui/$f" 2>/dev/null || true
+done
 
 # Descargar roles de agentes confinados
 for agent in lead-architect story-agent spec-architect qa-tester frontend-dev backend-dev git-agent; do
