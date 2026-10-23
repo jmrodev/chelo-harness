@@ -20,7 +20,7 @@ chmod +x "$BIN_DIR/chelo-harness"
 curl -fsSL "$BASE_URL/lib/chelo_channels.py" -o "$LIB_DIR/chelo_channels.py"
 
 # Descargar roles de agentes confinados
-for agent in lead-architect story-agent spec-architect qa-tester frontend-dev backend-dev; do
+for agent in lead-architect story-agent spec-architect qa-tester frontend-dev backend-dev git-agent; do
   curl -fsSL "$BASE_URL/agents/${agent}.md" -o "$AGENTS_DIR/${agent}.md" 2>/dev/null || true
 done
 

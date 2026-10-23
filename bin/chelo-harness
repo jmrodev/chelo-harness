@@ -941,11 +941,12 @@ def cmd_agent(role):
         "spec": "spec-architect",
         "qa": "qa-tester",
         "front": "frontend-dev",
-        "back": "backend-dev"
+        "back": "backend-dev",
+        "git": "git-agent"
     }
     if role not in roles:
         print(f"{RED}❌ Rol de agente desconocido: '{role}'{NC}")
-        print(f"{YELLOW}Roles disponibles: story, spec, qa, front, back{NC}")
+        print(f"{YELLOW}Roles disponibles: story, spec, qa, front, back, git{NC}")
         sys.exit(1)
 
     agent_id = roles[role]
