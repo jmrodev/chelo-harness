@@ -953,13 +953,21 @@ def cmd_interactive_session():
         resp = chelo_gemini_client.generate_content(initial_prompt, system_instruction=full_system)
         if resp.get("ok"):
             smooth_print(f"\n{resp['text']}\n", 0.05)
-            user_input = input(f"{BOLD}👉 Vos: {NC}").strip()
-            if user_input:
-                smooth_print(f"\n{CYAN}🧠 Procesando requerimiento con arquitectura Spec-First...{NC}\n", 0.05)
-                turn2 = f"El usuario solicita: '{user_input}'. Planteá el plan de acción atómico (Historias BDD, Contrato OpenAPI y Tests Hurl) para arrancar."
-                resp2 = chelo_gemini_client.generate_content(turn2, system_instruction=full_system)
-                if resp2.get("ok"):
-                    smooth_print(f"{resp2['text']}\n", 0.05)
+            
+            # Bucle interactivo continuo (REPL) para que no se salga
+            while True:
+                user_input = input(f"{BOLD}👉 Vos (o 'salir'): {NC}").strip()
+                if not user_input or user_input.lower() in ["salir", "exit", "quit", "q"]:
+                    smooth_print(f"{YELLOW}Sesión con el Lead-Architect finalizada.{NC}")
+                    break
+
+                smooth_print(f"\n{CYAN}🧠 Procesando con arquitectura Spec-First...{NC}\n", 0.05)
+                turn = f"El usuario responde: '{user_input}'. Continuá guiando el flujo (crear historias, contratos o ejecutar tests)."
+                resp_turn = chelo_gemini_client.generate_content(turn, system_instruction=full_system)
+                if resp_turn.get("ok"):
+                    smooth_print(f"{resp_turn['text']}\n", 0.03)
+                else:
+                    smooth_print(f"{RED}Error: {resp_turn.get('error')}{NC}")
         else:
             smooth_print(f"{RED}Error al conectar con Gemini: {resp.get('error')}{NC}")
     else:
