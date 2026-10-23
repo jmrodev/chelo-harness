@@ -1083,7 +1083,34 @@ def cmd_interactive_session():
 
                             print("")
                             smooth_print(f"{BOLD}{GREEN}🎉 Ciclo Spec-First generado con éxito. Verificando contrato con Prism Mock y Hurl...{NC}\n", 0.05)
-                            subprocess.run([sys.argv[0], "test"])
+                            test_result = subprocess.run([sys.argv[0], "test"], capture_output=True, text=True)
+                            print(test_result.stdout)
+                            if test_result.stderr:
+                                print(test_result.stderr)
+
+                            # REPORTAR DE VUELTA AL LEAD-ARCHITECT (Cierre de ciclo / Retroalimentación)
+                            feedback_prompt = (
+                                f"SISTEMA DE RETROALIMENTACIÓN DE AGENTES (ORQUESTADOR):\n"
+                                f"Los agentes acaban de completar su tarea física:\n"
+                                f"- Story-Agent: Creó {s_path.relative_to(Path.cwd())}\n"
+                                f"- Spec-Architect: Actualizó openapi.yaml con los esquemas y endpoints acordados.\n"
+                                f"- QA-Tester: Generó la suite {h_path.relative_to(Path.cwd())}\n"
+                                f"- Resultado de tests de contrato: {'PASARON CON ÉXITO' if test_result.returncode == 0 else 'FALLARON ALGUNAS PRUEBAS'}.\n\n"
+                                f"Informale al desarrollador este hito completado, hacé un balance del avance y preguntale si avanzamos al Backend-Dev o Frontend-Dev para este ticket."
+                            )
+
+                            conversation_history.append({"role": "user", "parts": [{"text": feedback_prompt}]})
+                            resp_feedback = chelo_gemini_client.generate_content(conversation_history, system_instruction=full_system)
+                            if resp_feedback.get("ok"):
+                                model_feedback = resp_feedback['text']
+                                conversation_history.append({"role": "model", "parts": [{"text": model_feedback}]})
+                                try:
+                                    history_file.write_text(json.dumps(conversation_history, ensure_ascii=False, indent=2), encoding="utf-8")
+                                except Exception:
+                                    pass
+                                print("")
+                                render_markdown_smooth(model_feedback)
+                                print("")
                         except Exception as ex:
                             smooth_print(f"{YELLOW}⚠️  Aviso al parsear artefactos automáticos: {ex}{NC}")
                     else:
