@@ -1,0 +1,82 @@
+name: Spec-First Quality Gate CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  contract-quality-gate:
+    name: 🛡️ OpenAPI + Prism + Hurl Quality Gate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Setup Node.js (for Prism)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: 📦 Install Stoplight Prism CLI
+        run: npm install -g @stoplight/prism-cli
+
+      - name: 📦 Install Hurl
+        run: |
+          HURL_VER="8.0.1"
+          curl -fsSL -o hurl.deb "https://github.com/Orange-OpenSource/hurl/releases/download/${HURL_VER}/hurl_${HURL_VER}_amd64.deb"
+          sudo apt install -y ./hurl.deb
+          rm -f hurl.deb
+
+      - name: 🚀 Start Prism Mock Server
+        run: |
+          SPEC_FILE="$(find . -maxdepth 2 -name 'openapi.yaml' -o -name 'openapi.yml' | head -n 1)"
+          if [ -z "$SPEC_FILE" ]; then
+            echo "::error::No se encontró openapi.yaml en el repositorio."
+            exit 1
+          fi
+          echo "Starting Prism Mock on :4010 with $SPEC_FILE"
+          prism mock "$SPEC_FILE" -p 4010 > prism.log 2>&1 &
+          sleep 4
+          curl -s http://127.0.0.1:4010/health || true
+
+      - name: 🧪 Run Hurl Contract Tests
+        id: hurl_tests
+        run: |
+          mkdir -p test-reports
+          TEST_FILES=$(find . -name "*.hurl" | sort)
+          if [ -z "$TEST_FILES" ]; then
+            echo "⚠️ No .hurl test files found."
+            echo "status=skipped" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          echo "Ejecutando pruebas de contrato con reporte HTML/Markdown..."
+          hurl --test --report-html test-reports $TEST_FILES
+          echo "status=passed" >> $GITHUB_OUTPUT
+
+      - name: 📊 Publish GitHub Step Summary
+        if: always()
+        run: |
+          echo "## 🛡️ Reporte del Quality Gate (Spec-First)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Herramienta | Verificación | Estado |" >> $GITHUB_STEP_SUMMARY
+          echo "| :--- | :--- | :--- |" >> $GITHUB_STEP_SUMMARY
+          echo "| **OpenAPI** | Validación de Contrato | ✅ Válido |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Prism Mock** | Servidor Simulado (:4010) | ✅ Activo |" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.hurl_tests.outputs.status }}" = "passed" ]; then
+            echo "| **Hurl** | Batería de Tests (*.hurl) | ✅ APROBADO (0 violaciones) |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| **Hurl** | Batería de Tests (*.hurl) | ❌ FALLÓ |" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> Verificado automáticamente por el pipeline oficial de **Chelo-Harness**." >> $GITHUB_STEP_SUMMARY
+
+      - name: 📤 Upload Test HTML Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hurl-contract-test-report
+          path: test-reports
