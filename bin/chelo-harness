@@ -85,6 +85,22 @@ MAX_ALLOWED_CHANGES = 10
 PRISM_PORT = 4010
 BACKEND_PORT = 8000
 
+def render_markdown_smooth(text):
+    """Renderiza Markdown con formato rico ANSI, resaltado de sintaxis y tablas."""
+    try:
+        from rich.console import Console
+        from rich.markdown import Markdown
+        from rich.panel import Panel
+        console = Console()
+        console.print(Panel(Markdown(text), border_style="cyan", title="[bold cyan]🧙 Lead-Architect[/bold cyan]"))
+    except ImportError:
+        # Fallback a visualizador bat o terminal estándar
+        if shutil.which("bat"):
+            p = subprocess.Popen(["bat", "--language=markdown", "--style=plain", "--paging=never"], stdin=subprocess.PIPE, text=True)
+            p.communicate(input=text)
+        else:
+            print(text)
+
 def stream_typewriter(text, char_delay=0.002, line_delay=0.05):
     """Escribe el texto carácter por carácter simulando streaming vivo para no escupir un bloque entero."""
     for line in text.splitlines():
@@ -967,22 +983,22 @@ def cmd_interactive_session():
         resp = chelo_gemini_client.generate_content(initial_prompt, system_instruction=full_system)
         if resp.get("ok"):
             print("")
-            stream_typewriter(resp['text'])
+            render_markdown_smooth(resp['text'])
             print("")
             
             # Bucle interactivo continuo (REPL) para que no se salga
             while True:
-                user_input = input(f"{BOLD}👉 Vos (o 'salir'): {NC}").strip()
+                user_input = input(f"{BOLD}{CYAN}👉 Vos (o 'salir'): {NC}").strip()
                 if not user_input or user_input.lower() in ["salir", "exit", "quit", "q"]:
                     smooth_print(f"{YELLOW}Sesión con el Lead-Architect finalizada.{NC}")
                     break
 
-                smooth_print(f"\n{CYAN}🧠 Procesando con arquitectura Spec-First...{NC}\n", 0.05)
+                smooth_print(f"\n{CYAN}🧠 Lead-Architect analizando requerimiento...{NC}\n", 0.05)
                 turn = f"El usuario responde: '{user_input}'. Continuá guiando el flujo (crear historias, contratos o ejecutar tests)."
                 resp_turn = chelo_gemini_client.generate_content(turn, system_instruction=full_system)
                 if resp_turn.get("ok"):
                     print("")
-                    stream_typewriter(resp_turn['text'])
+                    render_markdown_smooth(resp_turn['text'])
                     print("")
                 else:
                     smooth_print(f"{RED}Error: {resp_turn.get('error')}{NC}")
