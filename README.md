@@ -131,6 +131,29 @@ apunten afuera se rechazan antes de tocar el disco.
 
 ---
 
+## 🔑 Variables de Entorno
+
+Ningún canal ni ruta personal está hardcodeada. Todo se resuelve desde el
+entorno o desde un `.env`.
+
+Orden de búsqueda de credenciales: variables de entorno → el archivo apuntado
+por `CHELO_ENV_FILE` → `.env` en el directorio actual o hasta tres padres →
+`~/.config/chelo/.env`.
+
+| Variable | Para qué |
+|---|---|
+| `CHELO_ENV_FILE` | Ruta a un `.env` que ya tenés, sin copiar secretos |
+| `GEMINI_API_KEY` / `GOOGLE_API_KEY` | Agentes y pipeline |
+| `SLACK_BOT_TOKEN` / `SLACK_USER_TOKEN` | Leer y publicar en Slack |
+| `SLACK_WEBHOOK_URL` | Publicar sin token |
+| `SLACK_CHANNEL_ID` | Canal por defecto (requerido por `sync` y `slack_post`) |
+| `SLACK_USERNAME` | Nombre de publicación; si no está, usa el de la app |
+| `SLACK_CHANNEL_PRACTICAS` | Alias de `SLACK_CHANNEL_ID`, por compatibilidad |
+
+Si falta el canal, el comando lo dice en vez de publicar en uno adivinado.
+
+---
+
 ## 🗂️ Estructura del Código
 
 Un módulo por responsabilidad. La regla: si dos cosas cambian por motivos
