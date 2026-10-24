@@ -10,20 +10,27 @@ AGENTS_DIR="$HOME/.local/share/chelo/agents"
 
 mkdir -p "$BIN_DIR" "$LIB_DIR" "$AGENTS_DIR"
 
-BASE_URL="https://raw.githubusercontent.com/jmrodev/chelo-harness/main"
+TARBALL_URL="https://github.com/jmrodev/chelo-harness/archive/refs/heads/main.tar.gz"
 
-# Descargar ejecutable principal
-curl -fsSL "$BASE_URL/bin/chelo-harness" -o "$BIN_DIR/chelo-harness"
+# Un solo tarball en vez de una descarga por archivo: la lista hardcodeada se
+# desincronizaba con cada módulo nuevo y no soporta paquetes (lib/ai/tools/,
+# lib/mcp/handlers/). Con el árbol completo, agregar un archivo no toca el
+# instalador.
+SRC_DIR="$(mktemp -d)"
+trap 'rm -rf "$SRC_DIR"' EXIT
+
+curl -fsSL "$TARBALL_URL" | tar -xz -C "$SRC_DIR"
+SRC_ROOT="$(find "$SRC_DIR" -maxdepth 1 -mindepth 1 -type d | head -n 1)"
+if [ -z "$SRC_ROOT" ] || [ ! -d "$SRC_ROOT/lib" ]; then
+  echo "✗ No se pudo descargar el árbol del repositorio desde $TARBALL_URL" >&2
+  exit 1
+fi
+
+mkdir -p "$LIB_DIR/lib" "$AGENTS_DIR"
+cp -R "$SRC_ROOT/lib/." "$LIB_DIR/lib/"
+cp "$SRC_ROOT/bin/chelo-harness" "$BIN_DIR/chelo-harness"
 chmod +x "$BIN_DIR/chelo-harness"
-
-# Descargar librería de canales y ui dashboard
-curl -fsSL "$BASE_URL/lib/chelo_channels.py" -o "$LIB_DIR/chelo_channels.py"
-curl -fsSL "$BASE_URL/lib/ui_dashboard.py" -o "$LIB_DIR/ui_dashboard.py"
-
-# Descargar roles de agentes confinados
-for agent in lead-architect story-agent spec-architect qa-tester frontend-dev backend-dev git-agent; do
-  curl -fsSL "$BASE_URL/agents/${agent}.md" -o "$AGENTS_DIR/${agent}.md" 2>/dev/null || true
-done
+cp -R "$SRC_ROOT/agents/." "$AGENTS_DIR/" 2>/dev/null || true
 
 echo "✓ Chelo-Harness instalado en $BIN_DIR/chelo-harness"
 echo ""

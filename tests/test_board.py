@@ -1,0 +1,382 @@
+#!/usr/bin/env python3
+"""
+Regresión del tablero (`lib/core/board.py`).
+
+Lo que este archivo fija:
+
+1. Cómo se lee el remoto: HTTPS, SSH y con o sin `.git` dan el mismo slug; un
+   remoto que no es GitHub no inventa uno.
+2. La URL del tablero se deriva del slug y sin slug no hay URL.
+3. Configurar Pages: si `gh` no está o no tiene sesión, no se llama a la API;
+   si el POST falla porque ya existe, se reintenta con PUT; si ambos fallan se
+   devuelve el stderr real, no un mensaje vacío.
+4. Inyectar el workflow: crea el archivo cuando falta, no pisa el existente sin
+   `force`, y nunca reporta éxito fuera de un repositorio.
+"""
+
+import io
+import re
+import tempfile
+import unittest
+from contextlib import redirect_stdout
+from pathlib import Path
+from unittest import mock
+
+from lib.core import board
+
+
+def _git_result(stdout="", returncode=0):
+    return mock.Mock(returncode=returncode, stdout=stdout, stderr="")
+
+
+class RepoSlug(unittest.TestCase):
+
+    def _slug(self, stdout, returncode=0):
+        with mock.patch.object(
+            board.subprocess, "run", return_value=_git_result(stdout, returncode)
+        ):
+            return board.repo_slug()
+
+    def test_https_remote(self):
+        self.assertEqual(self._slug("https://github.com/jmrodev/chelo-harness.git\n"),
+                         "jmrodev/chelo-harness")
+
+    def test_https_remote_without_dot_git(self):
+        self.assertEqual(self._slug("https://github.com/jmrodev/chelo-harness\n"),
+                         "jmrodev/chelo-harness")
+
+    def test_ssh_remote(self):
+        self.assertEqual(self._slug("git@github.com:jmrodev/chelo-harness.git\n"),
+                         "jmrodev/chelo-harness")
+
+    def test_trailing_slash_is_ignored(self):
+        self.assertEqual(self._slug("https://github.com/jmrodev/chelo-harness/\n"),
+                         "jmrodev/chelo-harness")
+
+    def test_a_non_github_remote_is_not_invented(self):
+        self.assertIsNone(self._slug("https://gitlab.com/jmrodev/chelo-harness.git\n"))
+
+    def test_a_failing_command_returns_none(self):
+        self.assertIsNone(self._slug("", returncode=128))
+
+    def test_it_asks_for_the_origin_url(self):
+        with mock.patch.object(board.subprocess, "run", return_value=_git_result("")) as run:
+            board.repo_slug()
+
+        run.assert_called_once_with(
+            ["git", "remote", "get-url", "origin"], capture_output=True, text=True
+        )
+
+
+class BoardUrl(unittest.TestCase):
+
+    def test_url_from_slug(self):
+        self.assertEqual(board.board_url("jmrodev/chelo-harness"),
+                         "https://jmrodev.github.io/chelo-harness/")
+
+    def test_no_slug_means_no_url(self):
+        with mock.patch.object(board, "repo_slug", return_value=None):
+            self.assertIsNone(board.board_url())
+
+    def test_malformed_slug_is_rejected(self):
+        self.assertIsNone(board.board_url("sin-barra"))
+
+
+class GhAuthenticated(unittest.TestCase):
+
+    def test_without_gh_it_does_not_run_anything(self):
+        with mock.patch.object(board.shutil, "which", return_value=None), \
+                mock.patch.object(board.subprocess, "run") as run:
+            self.assertFalse(board.gh_authenticated())
+
+        run.assert_not_called()
+
+    def test_with_gh_it_asks_for_the_status(self):
+        with mock.patch.object(board.shutil, "which", return_value="/usr/bin/gh"), \
+                mock.patch.object(board.subprocess, "run", return_value=_git_result("", 0)) as run:
+            self.assertTrue(board.gh_authenticated())
+
+        run.assert_called_once_with(["gh", "auth", "status"], capture_output=True, text=True)
+
+    def test_a_failed_status_is_not_authenticated(self):
+        with mock.patch.object(board.shutil, "which", return_value="/usr/bin/gh"), \
+                mock.patch.object(board.subprocess, "run", return_value=_git_result("", 4)):
+            self.assertFalse(board.gh_authenticated())
+
+
+class ConfigurePages(unittest.TestCase):
+
+    def _configure(self, slug, responses):
+        with mock.patch.object(board, "gh_authenticated", return_value=True), \
+                mock.patch.object(board.subprocess, "run", side_effect=responses) as run:
+            result = board.configure_pages(slug)
+        return result, run
+
+    def test_without_a_slug_it_does_not_call_the_api(self):
+        with mock.patch.object(board.subprocess, "run") as run:
+            ok, detail = board.configure_pages(None)
+
+        self.assertFalse(ok)
+        self.assertIn("origin", detail)
+        run.assert_not_called()
+
+    def test_without_an_authenticated_gh_it_does_not_call_the_api(self):
+        with mock.patch.object(board, "gh_authenticated", return_value=False), \
+                mock.patch.object(board.subprocess, "run") as run:
+            ok, detail = board.configure_pages("jmrodev/repo")
+
+        self.assertFalse(ok)
+        self.assertIn("gh", detail)
+        run.assert_not_called()
+
+    def test_a_successful_post_enables_pages(self):
+        created = mock.Mock(returncode=0, stdout="", stderr="")
+        (ok, detail), run = self._configure("jmrodev/repo", [created])
+
+        self.assertTrue(ok)
+        self.assertIn("habilitado", detail)
+        self.assertEqual(run.call_args.args[0][:4], ["gh", "api", "-X", "POST"])
+
+    def test_an_existing_site_falls_back_to_put(self):
+        created = mock.Mock(returncode=1, stdout="", stderr="already exists")
+        updated = mock.Mock(returncode=0, stdout="", stderr="lo que sea")
+        (ok, detail), run = self._configure("jmrodev/repo", [created, updated])
+
+        self.assertTrue(ok)
+        self.assertIn("actualizado", detail)
+        self.assertEqual(run.call_args.args[0][:4], ["gh", "api", "-X", "PUT"])
+
+    def test_both_failing_returns_the_real_stderr(self):
+        created = mock.Mock(returncode=1, stdout="", stderr="")
+        updated = mock.Mock(returncode=1, stdout="", stderr="HTTP 403: forbidden")
+        (ok, detail), _ = self._configure("jmrodev/repo", [created, updated])
+
+        self.assertFalse(ok)
+        self.assertIn("403", detail)
+
+    def test_both_failing_without_stderr_still_explains_itself(self):
+        created = mock.Mock(returncode=1, stdout="", stderr="")
+        updated = mock.Mock(returncode=1, stdout="", stderr="")
+        (ok, detail), _ = self._configure("jmrodev/repo", [created, updated])
+
+        self.assertFalse(ok)
+        self.assertTrue(detail.strip())
+
+    def test_the_api_paths_name_the_repository(self):
+        created = mock.Mock(returncode=0, stdout="", stderr="")
+        (_, _), run = self._configure("jmrodev/repo", [created])
+
+        self.assertIn("repos/jmrodev/repo/pages", run.call_args.args[0])
+
+
+class BoardInit(unittest.TestCase):
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+
+        patcher = mock.patch.object(board, "repo_root", return_value=self.root)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        patcher = mock.patch.object(board, "repo_slug", return_value="jmrodev/repo")
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        patcher = mock.patch.object(board, "configure_pages", return_value=(True, "ok"))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def workflow(self):
+        return self.root / board.WORKFLOW_RELATIVE
+
+    def test_outside_a_repository_it_fails_explicitly(self):
+        with mock.patch.object(board, "repo_root", return_value=None):
+            result = board.board_init()
+
+        self.assertFalse(result["ok"])
+        self.assertIn("repositorio Git", result["error"])
+
+    def test_it_creates_the_workflow_when_missing(self):
+        result = board.board_init()
+
+        self.assertTrue(result["ok"])
+        self.assertTrue(result["created"])
+        self.assertTrue(self.workflow().is_file())
+        self.assertIn("Deploy Project Board", self.workflow().read_text(encoding="utf-8"))
+
+    def test_it_does_not_overwrite_an_existing_workflow(self):
+        self.workflow().parent.mkdir(parents=True)
+        self.workflow().write_text("propio", encoding="utf-8")
+
+        result = board.board_init()
+
+        self.assertFalse(result["created"])
+        self.assertEqual(self.workflow().read_text(encoding="utf-8"), "propio")
+
+    def test_force_overwrites(self):
+        self.workflow().parent.mkdir(parents=True)
+        self.workflow().write_text("propio", encoding="utf-8")
+
+        result = board.board_init(force=True)
+
+        self.assertTrue(result["created"])
+        self.assertIn("Deploy Project Board", self.workflow().read_text(encoding="utf-8"))
+
+    def test_it_reports_the_public_url(self):
+        result = board.board_init()
+
+        self.assertEqual(result["url"], "https://jmrodev.github.io/repo/")
+
+    def test_pages_failure_becomes_manual_steps(self):
+        with mock.patch.object(board, "configure_pages", return_value=(False, "sin sesión")):
+            result = board.board_init()
+
+        self.assertTrue(result["ok"])
+        self.assertTrue(result["manual_steps"])
+        self.assertEqual(result["pages_detail"], "sin sesión")
+
+    def test_pages_success_needs_no_manual_steps(self):
+        result = board.board_init()
+
+        self.assertFalse(result["manual_steps"])
+
+
+class CommandPresentation(unittest.TestCase):
+    """La CLI informa si creó o encontró el workflow: son acciones distintas."""
+
+    def _run(self, created):
+        result = {
+            "ok": True, "workflow": "x", "created": created, "slug": "jmrodev/repo",
+            "pages_configured": True, "pages_detail": "ok",
+            "url": "https://jmrodev.github.io/repo/", "manual_steps": False, "next": "push",
+        }
+        buffer = io.StringIO()
+        with mock.patch.object(board, "check_git_repo"), \
+                mock.patch.object(board, "banner"), \
+                mock.patch.object(board, "board_init", return_value=result), \
+                redirect_stdout(buffer):
+            board.cmd_board_init()
+        return buffer.getvalue()
+
+    def test_it_says_created(self):
+        self.assertIn("creado", self._run(True))
+
+    def test_it_says_it_already_existed(self):
+        self.assertIn("ya existía", self._run(False))
+
+
+class DefaultBranch(unittest.TestCase):
+    """La rama del disparador sale del repo destino, no de una constante."""
+
+    def _run(self, stdout="", returncode=0):
+        return mock.patch.object(
+            board.subprocess, "run",
+            return_value=mock.Mock(returncode=returncode, stdout=stdout, stderr=""),
+        )
+
+    def test_it_reads_origin_head(self):
+        with self._run("origin/master\n") as run:
+            self.assertEqual(board.default_branch(), "master")
+
+        self.assertEqual(run.call_args.args[0],
+                         ["git", "symbolic-ref", "--short", "refs/remotes/origin/HEAD"])
+
+    def test_it_strips_only_the_remote_prefix(self):
+        with self._run("origin/release/1.0\n"):
+            self.assertEqual(board.default_branch(), "release/1.0")
+
+    def test_a_failure_falls_back_to_main(self):
+        with self._run("", returncode=1):
+            self.assertEqual(board.default_branch(), "main")
+
+    def test_a_failed_command_does_not_trust_its_output(self):
+        with self._run("origin/basura\n", returncode=1):
+            self.assertEqual(board.default_branch(), "main")
+
+    def test_empty_output_falls_back_to_main(self):
+        with self._run("   \n"):
+            self.assertEqual(board.default_branch(), "main")
+
+    def test_a_ref_without_the_prefix_is_kept(self):
+        with self._run("master\n"):
+            self.assertEqual(board.default_branch(), "master")
+
+
+class RenderWorkflow(unittest.TestCase):
+
+    def test_main_is_the_default(self):
+        self.assertEqual(board.render_workflow(), board.BOARD_WORKFLOW)
+
+    def test_none_falls_back_to_main(self):
+        self.assertEqual(board.render_workflow(None), board.BOARD_WORKFLOW)
+
+    def test_it_replaces_the_push_branch(self):
+        workflow = board.render_workflow("master")
+
+        self.assertIn("      - master\n", workflow)
+        self.assertNotIn("      - main\n", workflow)
+
+    def test_nothing_else_changes(self):
+        workflow = board.render_workflow("master")
+        self.assertEqual(workflow.replace("      - master\n", "      - main\n", 1),
+                         board.BOARD_WORKFLOW)
+
+
+class BoardInitBranch(BoardInit):
+
+    def test_it_writes_the_detected_default_branch(self):
+        with mock.patch.object(board, "default_branch", return_value="master"):
+            board.board_init()
+
+        workflow = self.workflow().read_text(encoding="utf-8")
+        self.assertIn("      - master\n", workflow)
+        self.assertNotIn("      - main\n", workflow)
+
+
+class BoardWorkflowContract(unittest.TestCase):
+    """El workflow inyectado es una copia vendorizada del `install.sh` de Daily
+    Board. Estos asserts fijan ese contrato para que cualquier desvío sea
+    deliberado y ruidoso, y no un cambio silencioso de comportamiento.
+
+    Ojo con el rol de `repository:`: es de dónde baja la **app** (el reproductor
+    estático), no el repo cuyos issues muestra el tablero. El repo gestionado lo
+    resuelve el JS del board desde su propia URL de Pages (`js/state.js`,
+    `detectCurrentRepoSlug`). Cambiar este valor por el repo que instala el
+    workflow rompe el deploy: `actions/checkout` dejaría de encontrar el sitio.
+    """
+
+    def setUp(self):
+        self.workflow = board.BOARD_WORKFLOW
+
+    def test_it_checks_out_the_board_site_not_the_installing_repo(self):
+        self.assertIn("repository: jmrodev/daily-board", self.workflow)
+
+    def test_the_board_site_branch_is_pinned(self):
+        self.assertIn("ref: gh-pages", self.workflow)
+
+    def _artifact_paths(self):
+        """El path que descarga el checkout y el que sube a Pages deben ser el mismo."""
+        checkout, _, upload = self.workflow.partition("Upload Pages Artifact")
+        return (re.search(r"path:\s*(\S+)", checkout).group(1),
+                re.search(r"path:\s*(\S+)", upload).group(1))
+
+    def test_the_checkout_path_matches_the_uploaded_artifact(self):
+        checkout_path, upload_path = self._artifact_paths()
+        self.assertEqual(checkout_path, "./board-site")
+        self.assertEqual(upload_path, checkout_path)
+
+    def test_the_attribution_required_by_the_license_is_kept(self):
+        self.assertTrue(self.workflow.startswith("# Powered by Daily Board"))
+        self.assertIn("Juan Marcelo Rodríguez (@jmrodev)", self.workflow)
+
+    def test_pages_actions_have_the_permissions_they_need(self):
+        self.assertIn("pages: write", self.workflow)
+        self.assertIn("id-token: write", self.workflow)
+
+    def test_it_deploys_on_push_to_main_and_can_be_run_manually(self):
+        self.assertIn("- main", self.workflow)
+        self.assertIn("workflow_dispatch:", self.workflow)
+
+
+if __name__ == "__main__":
+    unittest.main()
