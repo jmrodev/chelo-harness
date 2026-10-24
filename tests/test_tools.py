@@ -191,12 +191,14 @@ class TestRunAgentTurnWiring(unittest.TestCase):
     """run_agent_turn debe entrar al bucle de tools solo cuando se lo piden."""
 
     def setUp(self):
-        from lib.core import orchestrator
+        # El turno vive en lib/orchestration/turn.py: es ahí donde se resuelve
+        # get_agent_prompt, así que es ahí donde hay que parchear.
+        from lib.orchestration import turn
 
-        self.orchestrator = orchestrator
-        self._prompt = orchestrator.get_agent_prompt
-        orchestrator.get_agent_prompt = lambda role: "sos un agente confinado"
-        self.addCleanup(setattr, orchestrator, "get_agent_prompt", self._prompt)
+        self.orchestrator = turn
+        self._prompt = turn.get_agent_prompt
+        turn.get_agent_prompt = lambda role: "sos un agente confinado"
+        self.addCleanup(setattr, turn, "get_agent_prompt", self._prompt)
 
     def _patch_loop(self):
         seen = []

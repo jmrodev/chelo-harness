@@ -16,7 +16,7 @@ def available_roles():
 
 def h_agent_turn(args):
     with enter(args):
-        from lib.core.orchestrator import run_agent_turn, strip_markdown_blocks
+        from lib.orchestration import run_agent_turn, strip_markdown_blocks
         from lib.core.runner import get_agent_prompt
 
         role = (args.get("role") or "").strip()
@@ -61,7 +61,7 @@ def h_agent_turn(args):
 
 def h_pipeline(args):
     with enter(args):
-        from lib.core.orchestrator import run_pipeline
+        from lib.orchestration import run_pipeline
 
         requirement = (args.get("requirement") or "").strip()
         if not requirement:

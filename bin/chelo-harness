@@ -23,7 +23,7 @@ from lib.core.gate import check_git_repo, audit_changes_rule
 from lib.core.setup import cmd_setup, cmd_doctor
 from lib.core.init_project import cmd_init
 from lib.core.startup import check_credentials_and_stack
-from lib.core.orchestrator import run_pipeline, get_project_name, cmd_story, cmd_agent, available_roles
+from lib.orchestration import run_pipeline, get_project_name, cmd_story, cmd_agent, available_roles
 from lib.core.board import cmd_board_init, cmd_board_open
 from lib.chelo_channels import get_github_sprint_context, get_slack_messages
 from lib.spec.mock_engine import cmd_mock, cmd_proxy, BACKEND_PORT
