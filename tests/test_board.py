@@ -15,6 +15,7 @@ Lo que este archivo fija:
 """
 
 import io
+import re
 import tempfile
 import unittest
 from contextlib import redirect_stdout
@@ -262,6 +263,51 @@ class CommandPresentation(unittest.TestCase):
 
     def test_it_says_it_already_existed(self):
         self.assertIn("ya existía", self._run(False))
+
+
+class BoardWorkflowContract(unittest.TestCase):
+    """El workflow inyectado es una copia vendorizada del `install.sh` de Daily
+    Board. Estos asserts fijan ese contrato para que cualquier desvío sea
+    deliberado y ruidoso, y no un cambio silencioso de comportamiento.
+
+    Ojo con el rol de `repository:`: es de dónde baja la **app** (el reproductor
+    estático), no el repo cuyos issues muestra el tablero. El repo gestionado lo
+    resuelve el JS del board desde su propia URL de Pages (`js/state.js`,
+    `detectCurrentRepoSlug`). Cambiar este valor por el repo que instala el
+    workflow rompe el deploy: `actions/checkout` dejaría de encontrar el sitio.
+    """
+
+    def setUp(self):
+        self.workflow = board.BOARD_WORKFLOW
+
+    def test_it_checks_out_the_board_site_not_the_installing_repo(self):
+        self.assertIn("repository: jmrodev/daily-board", self.workflow)
+
+    def test_the_board_site_branch_is_pinned(self):
+        self.assertIn("ref: gh-pages", self.workflow)
+
+    def _artifact_paths(self):
+        """El path que descarga el checkout y el que sube a Pages deben ser el mismo."""
+        checkout, _, upload = self.workflow.partition("Upload Pages Artifact")
+        return (re.search(r"path:\s*(\S+)", checkout).group(1),
+                re.search(r"path:\s*(\S+)", upload).group(1))
+
+    def test_the_checkout_path_matches_the_uploaded_artifact(self):
+        checkout_path, upload_path = self._artifact_paths()
+        self.assertEqual(checkout_path, "./board-site")
+        self.assertEqual(upload_path, checkout_path)
+
+    def test_the_attribution_required_by_the_license_is_kept(self):
+        self.assertTrue(self.workflow.startswith("# Powered by Daily Board"))
+        self.assertIn("Juan Marcelo Rodríguez (@jmrodev)", self.workflow)
+
+    def test_pages_actions_have_the_permissions_they_need(self):
+        self.assertIn("pages: write", self.workflow)
+        self.assertIn("id-token: write", self.workflow)
+
+    def test_it_deploys_on_push_to_main_and_can_be_run_manually(self):
+        self.assertIn("- main", self.workflow)
+        self.assertIn("workflow_dispatch:", self.workflow)
 
 
 if __name__ == "__main__":

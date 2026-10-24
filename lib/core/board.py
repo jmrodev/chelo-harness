@@ -19,6 +19,25 @@ from lib.ui.console import BLUE, BOLD, CYAN, GREEN, NC, RED, YELLOW, banner, smo
 
 WORKFLOW_RELATIVE = Path(".github/workflows/board.yml")
 
+# Copia vendorizada del bloque que `install.sh` de Daily Board escribe en
+# https://github.com/jmrodev/daily-board (rama `main`), más la línea de
+# atribución que exige su LICENSE. Si upstream cambia el workflow, comparar
+# contra su instalar antes de editar acá.
+#
+# OJO CON LOS DOS ROLES — no son el mismo repositorio:
+#
+#   * `repository: jmrodev/daily-board` es de dónde baja la APP: HTML, CSS y JS
+#     estático de la rama `gh-pages`. Es el reproductor, no el contenido.
+#   * El repo cuyos issues, PRs y milestones muestra el tablero es el repo donde
+#     se deploya este workflow. Lo resuelve el propio JS del board desde su URL
+#     de Pages (`js/state.js`, `detectCurrentRepoSlug`): en
+#     `owner.github.io/repo/` lee `owner/repo`, y acepta `?repo=owner/repo`
+#     como override explícito.
+#
+# Por eso el slug NO se configura por entorno: reemplazarlo por el repo que
+# instala el workflow haría que `actions/checkout` no encuentre el sitio y el
+# deploy falle. El contrato está fijado en `BoardWorkflowContract`
+# (tests/test_board.py).
 BOARD_WORKFLOW = """# Powered by Daily Board — Creado por Juan Marcelo Rodríguez (@jmrodev)
 name: Deploy Project Board
 
