@@ -1,49 +1,62 @@
 """
 Resolución de credenciales.
 
-Única pieza que sabe de dónde salen los secretos: entorno, `.env` cercano o el
-`.env` central de prácticas. Slack y GitHub la usan; ninguno de los dos sabe
-cómo se resuelve.
+Orden de búsqueda:
+
+    1. variables de entorno
+    2. el archivo apuntado por CHELO_ENV_FILE
+    3. .env en el cwd o hasta tres directorios hacia arriba
+    4. ~/.config/chelo/.env
+
+No hay rutas personales acá: la tuya se declara con CHELO_ENV_FILE, así que
+podés apuntar a un .env que ya tenés sin copiar secretos de un lado a otro.
 """
 
 import os
 from pathlib import Path
 
+ENV_VAR = "CHELO_ENV_FILE"
+USER_CONFIG = Path.home() / ".config" / "chelo" / ".env"
+
+
+def _candidate_files():
+    """Archivos a revisar, en orden de prioridad."""
+    override = os.environ.get(ENV_VAR)
+    if override:
+        yield Path(os.path.expanduser(override))
+
+    cwd = Path.cwd()
+    for parent in [cwd] + list(cwd.parents)[:3]:
+        yield parent / ".env"
+
+    yield USER_CONFIG
+
+
+def _read_from(path, key):
+    try:
+        with open(path, encoding="utf-8") as handle:
+            for line in handle:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                name, value = line.split("=", 1)
+                if name.strip() == key:
+                    return value.strip().strip('"').strip("'")
+    except Exception:  # noqa: BLE001
+        pass
+    return None
+
 
 def get_secret(key, default=None):
-    """Obtiene credenciales desde variables de entorno, .env local, o secrets centrales."""
-    # 1. Variables de entorno activas
-    if os.environ.get(key):
-        return os.environ.get(key)
+    """Primer valor encontrado para `key`, o `default`."""
+    value = os.environ.get(key)
+    if value:
+        return value
 
-    # 2. Archivo .env en el directorio actual o padres
-    curr = Path.cwd()
-    for parent in [curr] + list(curr.parents)[:3]:
-        env_file = parent / ".env"
-        if env_file.exists():
-            try:
-                with open(env_file, encoding="utf-8") as f:
-                    for line in f:
-                        line = line.strip()
-                        if line and not line.startswith("#") and "=" in line:
-                            k, v = line.split("=", 1)
-                            if k.strip() == key:
-                                return v.strip().strip('"').strip("'")
-            except Exception:
-                pass
-
-    # 3. Fallback a la ubicación de InstituteProjects2026
-    inst_env = Path.home() / "Documents/Academy/TECDA/TERCERO/Practicas_profesionalizantes/InstituteProjects2026/.env"
-    if inst_env.exists():
-        try:
-            with open(inst_env, encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if line and not line.startswith("#") and "=" in line:
-                        k, v = line.split("=", 1)
-                        if k.strip() == key:
-                            return v.strip().strip('"').strip("'")
-        except Exception:
-            pass
+    for path in _candidate_files():
+        if path.is_file():
+            found = _read_from(path, key)
+            if found is not None:
+                return found
 
     return default
