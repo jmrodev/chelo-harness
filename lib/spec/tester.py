@@ -86,36 +86,40 @@ def execute_tests_and_collect_errors():
     failed = 0
     errors = []
 
-    for hf in hurl_files:
-        print(f"   🧪 Testeando {hf.name}...", end=" ", flush=True)
-        if hurl_bin:
-            res = subprocess.run([hurl_bin, "--test", str(hf)], capture_output=True, text=True)
-            passed = (res.returncode == 0)
-            raw_err = (res.stderr or "").strip()
-            filtered_lines = [
-                line for line in raw_err.splitlines()
-                if "no version information available" not in line
-            ]
-            err = "\n".join(filtered_lines).strip()
-        else:
-            passed = run_native_python_test(hf)
-            err = "El status code o payload no coincidió con lo esperado."
+    try:
+        for hf in hurl_files:
+            print(f"   🧪 Testeando {hf.name}...", end=" ", flush=True)
+            if hurl_bin:
+                res = subprocess.run([hurl_bin, "--test", str(hf)], capture_output=True, text=True)
+                passed = (res.returncode == 0)
+                raw_err = (res.stderr or "").strip()
+                filtered_lines = [
+                    line for line in raw_err.splitlines()
+                    if "no version information available" not in line
+                ]
+                err = "\n".join(filtered_lines).strip()
+            else:
+                passed = run_native_python_test(hf)
+                err = "El status code o payload no coincidió con lo esperado."
 
-        if passed:
-            print(f"{GREEN}PASÓ ✓{NC}")
-        else:
-            print(f"{RED}FALLÓ ✗{NC}")
-            failed += 1
-            if err:
-                print(f"{YELLOW}{err[:300]}{NC}")
-                errors.append(f"Archivo: {hf.name}\nDetalle:\n{err}")
-
-    if mock_proc:
-        mock_proc.terminate()
-        try:
-            mock_proc.wait(timeout=2)
-        except Exception:
-            mock_proc.kill()
+            if passed:
+                print(f"{GREEN}PASÓ ✓{NC}")
+            else:
+                print(f"{RED}FALLÓ ✗{NC}")
+                failed += 1
+                if err:
+                    print(f"{YELLOW}{err[:300]}{NC}")
+                    errors.append(f"Archivo: {hf.name}\nDetalle:\n{err}")
+    finally:
+        # El mock se levanta acá: si un test lanza, igual hay que soltar el
+        # puerto. Un Prism huérfano hace fallar la próxima corrida por un
+        # motivo que no tiene nada que ver.
+        if mock_proc:
+            mock_proc.terminate()
+            try:
+                mock_proc.wait(timeout=2)
+            except Exception:
+                mock_proc.kill()
 
     if failed == 0:
         print(f"\n{GREEN}{BOLD}✓ TODAS LAS PRUEBAS SUPERADAS SIN VIOLACIONES DE CONTRATO.{NC}\n")
