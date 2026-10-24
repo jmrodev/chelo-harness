@@ -31,6 +31,59 @@ def find_prism_runner():
         return ["npx", "--yes", "@stoplight/prism-cli@5"]
     return None
 
+
+HTTP_METHODS = ("get", "post", "put", "delete", "patch")
+DEFAULT_RESPONSE = {"status": 200, "body": {"status": "ok", "mock": "python-native"}}
+
+
+def parse_endpoints(text):
+    """
+    Lee rutas y métodos de un OpenAPI sin dependencias.
+
+    El parser es deliberadamente superficial: alcanza para que el mock nativo
+    conteste algo coherente cuando no hay Prism. Devuelve
+
+        {"/users": {"GET": {"status": 200, "body": {...}}}}
+    """
+    endpoints = {}
+    current_path = None
+
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("/") and stripped.endswith(":"):
+            current_path = stripped[:-1]
+            endpoints[current_path] = {}
+        elif current_path and stripped in [f"{method}:" for method in HTTP_METHODS]:
+            method = stripped[:-1].upper()
+            endpoints[current_path][method] = {
+                "status": DEFAULT_RESPONSE["status"],
+                "body": dict(DEFAULT_RESPONSE["body"]),
+            }
+
+    return endpoints
+
+
+def build_response(endpoints, method, path):
+    """
+    Devuelve `(status, body)` para un request.
+
+    El orden importa y es el histórico: health primero, después el 201 de
+    cualquier POST, después la ruta declarada y al final el comodín.
+    """
+    parsed_path = path.split("?")[0]
+
+    if parsed_path in ("/health", "/api/health"):
+        return 200, {"status": "healthy", "service": "chelo-harness-mock"}
+
+    if method == "POST":
+        return 201, {"status": "created", "mock": True, "path": parsed_path}
+
+    matched = endpoints.get(parsed_path, {}).get(method)
+    if matched:
+        return matched["status"], matched["body"]
+
+    return 200, {"message": f"Chelo Mock: {method} {parsed_path}", "status": "ok"}
+
 def run_native_python_mock(spec_path, port=PRISM_PORT):
     """Mock server nativo HTTP con Python estándar sin dependencias."""
     import http.server
@@ -42,16 +95,7 @@ def run_native_python_mock(spec_path, port=PRISM_PORT):
 
     endpoints = {}
     try:
-        content = spec_path.read_text(encoding="utf-8")
-        current_path = None
-        for line in content.splitlines():
-            line_str = line.strip()
-            if line_str.startswith("/") and line_str.endswith(":"):
-                current_path = line_str[:-1]
-                endpoints[current_path] = {}
-            elif current_path and line_str in ["get:", "post:", "put:", "delete:", "patch:"]:
-                current_method = line_str[:-1].upper()
-                endpoints[current_path][current_method] = {"status": 200, "body": {"status": "ok", "mock": "python-native"}}
+        endpoints = parse_endpoints(spec_path.read_text(encoding="utf-8"))
     except Exception as e:
         print(f"{YELLOW}Nota: parsing básico de OpenAPI: {e}{NC}")
 
@@ -69,20 +113,7 @@ def run_native_python_mock(spec_path, port=PRISM_PORT):
             self._handle_request("DELETE")
 
         def _handle_request(self, method):
-            parsed_path = self.path.split("?")[0]
-            matched = endpoints.get(parsed_path, {}).get(method)
-            
-            status = 200
-            if parsed_path in ["/health", "/api/health"]:
-                body = {"status": "healthy", "service": "chelo-harness-mock"}
-            elif method == "POST":
-                status = 201
-                body = {"status": "created", "mock": True, "path": parsed_path}
-            elif matched:
-                status = matched["status"]
-                body = matched["body"]
-            else:
-                body = {"message": f"Chelo Mock: {method} {parsed_path}", "status": "ok"}
+            status, body = build_response(endpoints, method, self.path)
 
             payload = json.dumps(body, indent=2).encode("utf-8")
             self.send_response(status)
