@@ -9,13 +9,26 @@ import subprocess
 from pathlib import Path
 from lib.ui.console import RED, GREEN, YELLOW, CYAN, BLUE, BOLD, NC, banner, smooth_print
 
+def _inside_git_repo():
+    """
+    ¿El directorio actual ya está dentro de un repositorio git?
+
+    Mirar `cwd/.git` no alcanza: en un subdirectorio no existe, y ahí `git init`
+    crearía un repositorio anidado dentro del repo del usuario.
+    """
+    result = subprocess.run(
+        ["git", "rev-parse", "--is-inside-work-tree"], capture_output=True, text=True
+    )
+    return result.returncode == 0 and result.stdout.strip() == "true"
+
+
 def cmd_init():
     banner()
     cwd = Path.cwd()
     smooth_print(f"{BLUE}Iniciando Chelo-Harness en:{NC} {cwd}\n", 0.1)
 
     # 1. Verificar git
-    if not (cwd / ".git").exists():
+    if not _inside_git_repo():
         smooth_print(f"  {YELLOW}Inicializando repositorio git...{NC}", 0.05)
         # capture_output es obligatorio: git hereda el fd 1 del proceso. En el
         # servidor MCP ese fd es el canal JSON-RPC, y redirect_stdout no alcanza
