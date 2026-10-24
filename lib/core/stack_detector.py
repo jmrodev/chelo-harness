@@ -5,6 +5,9 @@ Módulo de detección de stack tecnológico del workspace.
 
 from pathlib import Path
 
+from lib.spec.mock_engine import find_openapi_spec
+
+
 def detect_workspace_stack(root_dir: Path = None) -> dict:
     cwd = root_dir or Path.cwd()
     stack = {
@@ -17,7 +20,9 @@ def detect_workspace_stack(root_dir: Path = None) -> dict:
     }
 
     # OpenAPI & Hurl
-    if list(cwd.glob("**/openapi.ya*ml")) or list(cwd.glob("**/api.ya*ml")):
+    # La regla de "dónde está el contrato" vive en find_openapi_spec: si acá se
+    # escribe otra, la sesión y `mock` contestan distinto sobre el mismo repo.
+    if find_openapi_spec(cwd):
         stack["has_openapi"] = True
     if list(cwd.glob("**/*.hurl")):
         stack["has_hurl"] = True

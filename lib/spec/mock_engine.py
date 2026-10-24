@@ -14,10 +14,21 @@ from lib.ui.console import RED, GREEN, YELLOW, CYAN, BLUE, BOLD, NC, banner
 PRISM_PORT = 4010
 BACKEND_PORT = 8000
 
-def find_openapi_spec():
-    candidates = list(Path.cwd().glob("**/openapi.yaml")) + \
-                 list(Path.cwd().glob("**/openapi.yml")) + \
-                 list(Path.cwd().glob("**/api*.yaml"))
+OPENAPI_PATTERNS = ("openapi.yaml", "openapi.yml", "api*.yaml")
+
+
+def find_openapi_spec(root=None):
+    """
+    Busca el contrato OpenAPI en `root` (por defecto, el cwd).
+
+    Fuente única de la regla: el orden de `OPENAPI_PATTERNS` decide cuál gana
+    cuando hay varios. La usa también el detector de stack, para que la sesión
+    no diga "no encontrado" sobre un contrato que el mock sí levanta.
+    """
+    base = Path.cwd() if root is None else root
+    candidates = [
+        path for pattern in OPENAPI_PATTERNS for path in base.glob(f"**/{pattern}")
+    ]
     return candidates[0] if candidates else None
 
 def find_prism_runner():

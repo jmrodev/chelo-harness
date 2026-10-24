@@ -64,6 +64,17 @@ class FindOpenApiSpec(unittest.TestCase):
     def test_without_a_spec_it_returns_none(self):
         self.assertIsNone(mock_engine.find_openapi_spec())
 
+    def test_it_searches_the_root_it_is_given(self):
+        """El detector de stack le pasa un root; si se ignora, miente."""
+        outside = tempfile.TemporaryDirectory()
+        self.addCleanup(outside.cleanup)
+        elsewhere = Path(outside.name)
+        expected = elsewhere / "api-v2.yaml"
+        expected.write_text("openapi: 3.0.0\n", encoding="utf-8")
+
+        self.assertIsNone(mock_engine.find_openapi_spec())
+        self.assertEqual(mock_engine.find_openapi_spec(elsewhere), expected)
+
 
 class FindPrismRunner(unittest.TestCase):
 
