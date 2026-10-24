@@ -84,6 +84,33 @@ jobs:
 """
 
 
+# Rama del disparador. El workflow sólo corre en las ramas listadas en
+# `on.push.branches`: con `main` fijo, un repo con otra rama por defecto nunca
+# deploya y Pages queda vacío, sin ningún error visible.
+PUSH_BRANCH_LINE = "      - main\n"
+
+
+def render_workflow(branch="main"):
+    """Devuelve el workflow con la rama del disparador sustituida."""
+    branch = branch or "main"
+    return BOARD_WORKFLOW.replace(PUSH_BRANCH_LINE, f"      - {branch}\n", 1)
+
+
+def default_branch():
+    """Rama por defecto del repo actual, según origin/HEAD. Fallback: `main`."""
+    result = subprocess.run(
+        ["git", "symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return "main"
+    ref = result.stdout.strip()
+    if not ref:
+        return "main"
+    return ref[len("origin/"):] if ref.startswith("origin/") else ref
+
+
 def repo_root():
     result = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True)
     if result.returncode != 0 or not result.stdout.strip():
@@ -152,7 +179,7 @@ def board_init(force=False):
         pass
     else:
         workflow.parent.mkdir(parents=True, exist_ok=True)
-        workflow.write_text(BOARD_WORKFLOW, encoding="utf-8")
+        workflow.write_text(render_workflow(default_branch()), encoding="utf-8")
         created = True
 
     slug = repo_slug()

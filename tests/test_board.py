@@ -265,6 +265,74 @@ class CommandPresentation(unittest.TestCase):
         self.assertIn("ya existía", self._run(False))
 
 
+class DefaultBranch(unittest.TestCase):
+    """La rama del disparador sale del repo destino, no de una constante."""
+
+    def _run(self, stdout="", returncode=0):
+        return mock.patch.object(
+            board.subprocess, "run",
+            return_value=mock.Mock(returncode=returncode, stdout=stdout, stderr=""),
+        )
+
+    def test_it_reads_origin_head(self):
+        with self._run("origin/master\n") as run:
+            self.assertEqual(board.default_branch(), "master")
+
+        self.assertEqual(run.call_args.args[0],
+                         ["git", "symbolic-ref", "--short", "refs/remotes/origin/HEAD"])
+
+    def test_it_strips_only_the_remote_prefix(self):
+        with self._run("origin/release/1.0\n"):
+            self.assertEqual(board.default_branch(), "release/1.0")
+
+    def test_a_failure_falls_back_to_main(self):
+        with self._run("", returncode=1):
+            self.assertEqual(board.default_branch(), "main")
+
+    def test_a_failed_command_does_not_trust_its_output(self):
+        with self._run("origin/basura\n", returncode=1):
+            self.assertEqual(board.default_branch(), "main")
+
+    def test_empty_output_falls_back_to_main(self):
+        with self._run("   \n"):
+            self.assertEqual(board.default_branch(), "main")
+
+    def test_a_ref_without_the_prefix_is_kept(self):
+        with self._run("master\n"):
+            self.assertEqual(board.default_branch(), "master")
+
+
+class RenderWorkflow(unittest.TestCase):
+
+    def test_main_is_the_default(self):
+        self.assertEqual(board.render_workflow(), board.BOARD_WORKFLOW)
+
+    def test_none_falls_back_to_main(self):
+        self.assertEqual(board.render_workflow(None), board.BOARD_WORKFLOW)
+
+    def test_it_replaces_the_push_branch(self):
+        workflow = board.render_workflow("master")
+
+        self.assertIn("      - master\n", workflow)
+        self.assertNotIn("      - main\n", workflow)
+
+    def test_nothing_else_changes(self):
+        workflow = board.render_workflow("master")
+        self.assertEqual(workflow.replace("      - master\n", "      - main\n", 1),
+                         board.BOARD_WORKFLOW)
+
+
+class BoardInitBranch(BoardInit):
+
+    def test_it_writes_the_detected_default_branch(self):
+        with mock.patch.object(board, "default_branch", return_value="master"):
+            board.board_init()
+
+        workflow = self.workflow().read_text(encoding="utf-8")
+        self.assertIn("      - master\n", workflow)
+        self.assertNotIn("      - main\n", workflow)
+
+
 class BoardWorkflowContract(unittest.TestCase):
     """El workflow inyectado es una copia vendorizada del `install.sh` de Daily
     Board. Estos asserts fijan ese contrato para que cualquier desvío sea
