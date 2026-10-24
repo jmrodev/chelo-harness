@@ -9,10 +9,10 @@ import re
 from pathlib import Path
 
 from lib.core.gate import check_git_repo
+from lib.core.resources import available_roles
 from lib.core.runner import get_agent_prompt
 from lib.ui.console import BLUE, BOLD, CYAN, GREEN, NC, RED, YELLOW, banner, render_markdown_smooth, smooth_print
 
-from .roles import available_roles
 from .turn import run_agent_turn, strip_markdown_blocks
 
 

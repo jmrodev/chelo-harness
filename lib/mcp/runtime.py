@@ -85,21 +85,10 @@ def enter(args):
 
 
 def agents_dir():
-    """
-    Ubica los roles de agente.
+    """Reexporta la ubicación única de roles (`lib.core.resources`)."""
+    from lib.core.resources import agents_dir as locate
 
-    En el repo viven en `<repo>/agents`; instalado viven en
-    `~/.local/share/chelo/agents`. Probar ambos evita que el MCP instalado
-    reporte una lista vacía.
-    """
-    for candidate in (
-        PKG_ROOT / "agents",
-        Path.home() / ".local/share/chelo/agents",
-        Path.cwd() / "agents",
-    ):
-        if candidate.is_dir():
-            return candidate
-    return None
+    return locate()
 
 
 # ---------------------------------------------------------------------------

@@ -5,13 +5,9 @@ Handlers de agentes: turno individual y pipeline Spec-First completo.
 from pathlib import Path
 
 from lib.core.paths import resolve_within
+from lib.core.resources import available_roles
 
-from ..runtime import agents_dir, enter, invoke
-
-
-def available_roles():
-    directory = agents_dir()
-    return sorted(path.stem for path in directory.glob("*.md")) if directory else []
+from ..runtime import enter, invoke
 
 
 def h_agent_turn(args):

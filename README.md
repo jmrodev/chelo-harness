@@ -184,13 +184,12 @@ lib/
 ├── orchestration/
 │   ├── turn.py               un turno: prompt + modelo (+ bucle de tools)
 │   ├── pipeline.py           la cadena Spec-First y sus reglas de corrección
-│   ├── roles.py              dónde viven los roles y cuáles hay
 │   └── cli.py                comandos story / agent
 ├── channels/
 │   ├── secrets.py            de dónde salen las credenciales
 │   ├── slack.py              leer y publicar mensajes
 │   └── github.py             milestone activo e issues vía gh
-├── core/                     gate, paths, runner, board, setup, init_project
+├── core/                     gate, paths, resources, runner, board, setup, init_project
 ├── spec/                     mock_engine, tester
 └── ui/                       consola
 ```
