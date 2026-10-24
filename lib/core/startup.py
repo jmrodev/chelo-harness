@@ -46,7 +46,12 @@ def check_credentials_and_stack(trace: bool = False):
     gemini_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     anthropic_key = os.environ.get("ANTHROPIC_API_KEY")
     openai_key = os.environ.get("OPENAI_API_KEY")
-    has_any_key = bool(gemini_key or anthropic_key or openai_key)
+
+    def configured(value):
+        """`DISABLED` es una decisión explícita de no configurar, no una clave."""
+        return bool(value) and value != "DISABLED"
+
+    has_any_key = any(configured(key) for key in (gemini_key, anthropic_key, openai_key))
 
     if gemini_key and gemini_key != "DISABLED":
         smooth_print(f"    {GREEN}✓ Gemini API Key:{NC}    {gemini_key[:4]}...{gemini_key[-4:]}")
@@ -65,9 +70,10 @@ def check_credentials_and_stack(trace: bool = False):
 
     # --- HERRAMIENTAS ---
     smooth_print(f"\n  {CYAN}Herramientas:{NC}")
+    local_hurl = Path.home() / ".local/bin/hurl"
     tools = {
         "prism": shutil.which("prism") or shutil.which("npx"),
-        "hurl": shutil.which("hurl") or str(Path.home() / ".local/bin/hurl") if (Path.home() / ".local/bin/hurl").exists() else None,
+        "hurl": shutil.which("hurl") or (str(local_hurl) if local_hurl.exists() else None),
         "gh": shutil.which("gh"),
     }
     for name, found in tools.items():
