@@ -20,6 +20,13 @@ def _channel(channel_id=None):
     return channel_id or get_secret("SLACK_CHANNEL_ID") or get_secret("SLACK_CHANNEL_PRACTICAS")
 
 
+def _decorate(payload, username):
+    """Agrega el nombre de publicación sólo si está configurado."""
+    if username:
+        payload["username"] = username
+    return payload
+
+
 def get_slack_messages(channel_id=None, limit=5):
     """Retorna lista de mensajes recientes de Slack en formato dict estructurado."""
     token = get_secret("SLACK_USER_TOKEN") or get_secret("SLACK_BOT_TOKEN")
@@ -56,10 +63,13 @@ def get_slack_messages(channel_id=None, limit=5):
 
 def post_slack_message(text, channel_id=None):
     """Envía un mensaje a Slack de forma segura."""
+    username = get_secret("SLACK_USERNAME")
+
     webhook = get_secret("SLACK_WEBHOOK_URL")
     if webhook:
+        body = json.dumps(_decorate({"text": text}, username)).encode("utf-8")
         try:
-            req = urllib.request.Request(webhook, data=json.dumps({"text": text}).encode("utf-8"), headers={
+            req = urllib.request.Request(webhook, data=body, headers={
                 "Content-Type": "application/json"
             }, method="POST")
             with urllib.request.urlopen(req, timeout=5) as resp:
@@ -75,10 +85,7 @@ def post_slack_message(text, channel_id=None):
     if not ch:
         return {"ok": False, "error": MISSING_CHANNEL}
 
-    payload = {"channel": ch, "text": text}
-    username = get_secret("SLACK_USERNAME")
-    if username:
-        payload["username"] = username
+    payload = _decorate({"channel": ch, "text": text}, username)
 
     req = urllib.request.Request(
         "https://slack.com/api/chat.postMessage",

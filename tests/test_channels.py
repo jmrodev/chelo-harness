@@ -148,6 +148,43 @@ class TestNoHardcodedUsername(Isolated):
         self.assertEqual(self._payload()["username"], "quien-publica")
 
 
+class TestWebhookPayload(Isolated):
+    """El webhook es la vía por defecto: no necesita token ni canal, pero sí
+    respetar SLACK_USERNAME igual que la vía por chat.postMessage."""
+
+    def _payload(self):
+        os.environ["SLACK_WEBHOOK_URL"] = "https://hooks.slack.test/abc"
+
+        sent = []
+        with mock.patch.object(slack.urllib.request, "urlopen", side_effect=_capture(sent)):
+            result = slack.post_slack_message("hola")
+
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(len(sent), 1)
+        self.assertEqual(sent[0].full_url, "https://hooks.slack.test/abc")
+        return json.loads(sent[0].data.decode("utf-8"))
+
+    def test_keeps_the_text(self):
+        self.assertEqual(self._payload()["text"], "hola")
+
+    def test_does_not_require_a_channel_or_a_token(self):
+        os.environ["SLACK_WEBHOOK_URL"] = "https://hooks.slack.test/abc"
+
+        sent = []
+        with mock.patch.object(slack.urllib.request, "urlopen", side_effect=_capture(sent)):
+            result = slack.post_slack_message("hola")
+
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(len(sent), 1)
+
+    def test_username_is_absent_by_default(self):
+        self.assertNotIn("username", self._payload())
+
+    def test_username_comes_from_the_environment(self):
+        os.environ["SLACK_USERNAME"] = "quien-publica"
+        self.assertEqual(self._payload()["username"], "quien-publica")
+
+
 def _capture(sent):
     """Fabrica un urlopen falso que anota el request y responde ok."""
 
