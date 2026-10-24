@@ -154,12 +154,20 @@ lib/
 ├── ai/
 │   ├── gemini_client.py      HTTP + bucle de function calling
 │   └── tools/
-│       ├── paths.py          sandbox de rutas (la única pieza que toca el disco)
 │       ├── files.py          read_file, list_dir, write_file, write_doc
 │       ├── shell.py          run_command
 │       ├── registry.py       qué tools existen y cuáles puede usar un agente
 │       └── declarations.py   esquemas JSON que se envían a Gemini
-├── core/                     gate, orquestador, runner, board, setup
+├── orchestration/
+│   ├── turn.py               un turno: prompt + modelo (+ bucle de tools)
+│   ├── pipeline.py           la cadena Spec-First y sus reglas de corrección
+│   ├── roles.py              dónde viven los roles y cuáles hay
+│   └── cli.py                comandos story / agent
+├── channels/
+│   ├── secrets.py            de dónde salen las credenciales
+│   ├── slack.py              leer y publicar mensajes
+│   └── github.py             milestone activo e issues vía gh
+├── core/                     gate, paths, runner, board, setup, init_project
 ├── spec/                     mock_engine, tester
 └── ui/                       consola
 ```
