@@ -7,7 +7,7 @@ from ..runtime import enter
 
 def h_sync(args):
     with enter(args):
-        from lib.chelo_channels import get_github_sprint_context, get_slack_messages
+        from lib.channels import get_github_sprint_context, get_slack_messages
 
         payload = {"slack": None, "github": None}
 
@@ -24,7 +24,7 @@ def h_sync(args):
 
 def h_slack_post(args):
     with enter(args):
-        from lib.chelo_channels import post_slack_message
+        from lib.channels import post_slack_message
 
         text = (args.get("text") or "").strip()
         if not text:
